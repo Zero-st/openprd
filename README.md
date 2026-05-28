@@ -12,7 +12,7 @@ OpenPrd is a lightweight **PRD harness** for teams and agents that need more tha
 
 Instead of hiding key decisions in prompts or terminal logs, OpenPrd keeps people and agents aligned around stable HTML artifacts such as `review.html`, learning readers, and quality reports.
 
-![OpenPrd scenario overview](./docs/assets/openprd-scenario-overview.png)
+![OpenPrd capability overview](./docs/assets/openprd-capability-overview-en.png)
 
 ## Why OpenPrd
 
@@ -30,15 +30,35 @@ It is especially useful when you want:
 - **policy-based review gates** that keep stable artifacts without forcing the same stop every time
 - **agent-facing skills** shipped with the tool, not hidden in a local environment
 
-## Usage Scenarios
+## Where OpenPrd Is Different
 
-| Scenario | Use OpenPrd to | Main artifacts |
-|----------|----------------|----------------|
-| New product idea | Clarify the problem, capture confirmed facts, and draft a reviewable PRD before implementation starts. | `clarify`, `capture`, `synthesize`, `review.html` |
-| Existing project intake | Mine current behavior, keep evidence visible, and turn gaps into structured changes. | `discovery`, `standards`, `change`, `tasks` |
-| Visual or product-flow confirmation | Review architecture, product flow, or UI replication before the team treats the work as done. | `diagram`, `visual-compare`, side-by-side JPG reviews |
-| Agent implementation loop | Break accepted work into dependency-ready tasks and run one focused agent session per task. | `loop`, prompts, progress logs, verification reports |
-| Release and handoff readiness | Check standards, regression evidence, cost/abuse guardrails, and handoff status before high-risk actions. | `quality`, `run --verify`, `doctor`, `handoff` |
+OpenPrd lives in a different spot than tools that are centered only on spec files
+or only on coding execution.
+
+| Tool | Center of gravity | Main user-facing artifacts | Best fit |
+|------|-------------------|----------------------------|----------|
+| **OpenPrd** | Requirement clarification, HTML-first collaboration, and delivery gates | `review.html`, learning readers, quality reports, diagrams, structured change/task state | Teams that need humans and agents to stay aligned through planning, review, execution, and ship decisions |
+| **OpenSpec** | Spec and change lifecycle | Markdown proposals, specs, design docs, tasks | Teams that want disciplined spec deltas and a clean change-management workflow |
+| **Superpowers** | Skill-driven coding execution | Skills, plans, worktree/subagent flows, code-review checkpoints | Engineering-heavy teams optimizing how AI agents plan, code, review, and finish branches |
+
+OpenPrd is strongest when the hard part is not just "what code should be written,"
+but "what should people confirm, what should stay visible, and what evidence is
+enough to move forward."
+
+## Common Real-World Scenarios
+
+Recent Codex project usage kept clustering around the same kinds of work: fuzzy
+product requests, existing-product redesigns, release/publish flows, production
+incident closure, and reusable learning handoff.
+
+| Scenario | Why OpenPrd stands out here | Main artifacts |
+|----------|-----------------------------|----------------|
+| Fuzzy product request before anyone codes | Clarify first, separate user-confirmed facts from agent inference, then turn the result into a stable review surface. | `clarify`, `capture`, `synthesize`, `review.html` |
+| Existing flow or auth-entry redesign | Reconstruct current behavior from repo and runtime evidence before proposing the next change. | `discovery`, `diagram`, `review.html`, `change` |
+| Visual or product-flow confirmation | Keep architecture, product flow, or UI replication reviewable instead of burying decisions in chat. | `diagram`, `visual-compare`, side-by-side JPG reviews |
+| Long-running agent implementation chain | Turn accepted work into dependency-ready tasks and run one focused agent session per task with verify gates. | `tasks`, `loop`, prompts, progress logs, verification reports |
+| Release, publish, or handoff readiness | Make "ready to ship" a visible decision with standards, regression evidence, abuse/cost guardrails, and workspace health. | `quality`, `run --verify`, `doctor`, `handoff` |
+| Learning handoff after a fix or project | Package the final requirement, reasoning, and outcome into something new collaborators can actually study. | learning reader, `.openprd/knowledge/skills/`, docs sync |
 
 ## HTML-First Collaboration Surfaces
 
