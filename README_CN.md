@@ -82,6 +82,12 @@ OpenPrd 会生成可以直接分享的 HTML 面板，让产品、研发和 Agent
 
 ![OpenPrd quality HTML](./docs/assets/openprd-quality-html.png)
 
+### `visual-compare` 案例图
+
+把效果图和实现截图放进同一张左右对比图里，适合登录入口改造、条款页本地化、弹窗复刻这类阶段性评审。
+
+![OpenPrd visual compare case study](./docs/assets/openprd-visual-compare-case-study.png)
+
 ## 功能
 
 - **Clarification-first**：`clarify -> capture -> classify -> interview -> synthesize -> diagram -> freeze -> handoff`

@@ -86,6 +86,14 @@ one human-readable quality surface before handoff, release, or publish.
 
 ![OpenPrd quality HTML](./docs/assets/openprd-quality-html.png)
 
+### `visual-compare` case study
+
+Put the reference and implementation into one side-by-side artifact for staged
+UI review, especially for auth-entry redesign, localized legal pages, and modal
+replication work.
+
+![OpenPrd visual compare case study](./docs/assets/openprd-visual-compare-case-study.png)
+
 ## Features
 
 - **Clarification-first workflow**: `clarify -> capture -> classify -> interview -> synthesize -> diagram -> freeze -> handoff`
