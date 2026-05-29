@@ -60,35 +60,6 @@ incident closure, and reusable learning handoff.
 | Release, publish, or handoff readiness | Make "ready to ship" a visible decision with standards, regression evidence, abuse/cost guardrails, and workspace health. | `quality`, `run --verify`, `doctor`, `handoff` |
 | Learning handoff after a fix or project | Package the final requirement, reasoning, and outcome into something new collaborators can actually study. | learning reader, `.openprd/knowledge/skills/`, docs sync |
 
-## Self-Evolving Collaboration
-
-OpenPrd gets easier to work with over time through two visible loops. One loop
-keeps proven team habits as reusable `Project-Level Skill`s. The other keeps
-`Dynamic Parameter Config` adaptive, so different project situations start with
-different collaboration defaults instead of the same generic checklist.
-
-![OpenPrd self-evolving collaboration](./docs/assets/openprd-self-evolving-mechanisms-en.png)
-
-### Scenario 1: Project-Level Skill
-
-When a team reaches the same conclusion in real work more than once, OpenPrd
-can keep that conclusion close to the project instead of leaving it buried in
-chat.
-
-- Example: a login-entry redesign confirms that log in, sign up, and password reset should all stay on the official site.
-- What gets reused next time: related page checks, release review points, and the preferred path through similar requests.
-- Why it matters: the next similar request starts from a shared playbook, and new teammates can follow the same steps without retelling the whole history.
-
-### Scenario 2: Dynamic Parameter Config
-
-Not every project should start the same way. OpenPrd can keep different
-collaboration defaults for different situations and bring them back
-automatically.
-
-- Example: a greenfield request starts with goal clarification and scope alignment, while an inherited project starts with current-state reconstruction and boundary mapping.
-- What changes automatically: what to ask first, what to inspect first, and what proof to gather before handoff.
-- Why it matters: teams spend less time re-explaining how this kind of project should run and more time moving with the right setup from the start.
-
 ## HTML-First Collaboration Surfaces
 
 OpenPrd produces stable, shareable HTML surfaces so product owners, engineers,
@@ -122,6 +93,35 @@ UI review, especially for auth-entry redesign, localized legal pages, and modal
 replication work.
 
 ![OpenPrd visual compare case study](./docs/assets/openprd-visual-compare-case-study-en.png)
+
+## Self-Evolving Collaboration
+
+OpenPrd gets easier to work with over time through two visible loops. One loop
+keeps proven team habits as reusable `Project-Level Skill`s. The other keeps
+`Dynamic Parameter Config` adaptive, so different project situations start with
+different collaboration defaults instead of the same generic checklist.
+
+![OpenPrd self-evolving collaboration](./docs/assets/openprd-self-evolving-mechanisms-en.png)
+
+### Scenario 1: Project-Level Skill
+
+When a team reaches the same conclusion in real work more than once, OpenPrd
+can keep that conclusion close to the project instead of leaving it buried in
+chat.
+
+- Example: a login-entry redesign confirms that log in, sign up, and password reset should all stay on the official site.
+- What gets reused next time: related page checks, release review points, and the preferred path through similar requests.
+- Why it matters: the next similar request starts from a shared playbook, and new teammates can follow the same steps without retelling the whole history.
+
+### Scenario 2: Dynamic Parameter Config
+
+Not every project should start the same way. OpenPrd can keep different
+collaboration defaults for different situations and bring them back
+automatically.
+
+- Example: a greenfield request starts with goal clarification and scope alignment, while an inherited project starts with current-state reconstruction and boundary mapping.
+- What changes automatically: what to ask first, what to inspect first, and what proof to gather before handoff.
+- Why it matters: teams spend less time re-explaining how this kind of project should run and more time moving with the right setup from the start.
 
 ## Features
 
