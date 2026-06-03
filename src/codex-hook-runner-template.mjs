@@ -861,23 +861,17 @@ function analyzePromptIntent(prompt) {
   // These signals only decide when to inject/open the requirement-intake lane.
   // The L0/L1/L2 decision itself belongs to openprd-requirement-intake, not to
   // this matcher.
-  const requirementRoutingSignals = [
+  const requirementRoutingSignalsStrong = [
     /新增/,
     /增加/,
     /新建/,
     /我希望/,
-    /用户反馈/,
     /需求/,
-    /功能/,
     /模块/,
-    /页面/,
-    /界面/,
-    /视觉/,
     /入口/,
     /流程/,
     /编排/,
     /一站式/,
-    /体验/,
     /信息架构/,
     /团队搭建/,
     /agent\s*市场/i,
@@ -886,6 +880,31 @@ function analyzePromptIntent(prompt) {
     /cli\s*库/i,
     /workflow/i,
     /wizard/i,
+  ];
+  const requirementRoutingSignalsWeak = [
+    /用户反馈/,
+    /功能/,
+    /页面/,
+    /界面/,
+    /视觉/,
+    /体验/,
+  ];
+  const requirementChangeIntentSignals = [
+    /新增/,
+    /增加/,
+    /新建/,
+    /改(动|版|造|进|一下)?/,
+    /优化/,
+    /调整/,
+    /重做/,
+    /重构/,
+    /放到/,
+    /移到/,
+    /移动到/,
+    /串联/,
+    /接入/,
+    /实现/,
+    /落地/,
   ];
   const tinyEditPatterns = [
     /加(一个|个)?空格/,
@@ -910,8 +929,11 @@ function analyzePromptIntent(prompt) {
     /直接(帮我|给我)?(改|做|实现|落地|修|修复|处理|解决)/,
     /如果.{0,24}(定位|确认|找到).{0,12}(原因|根因).{0,24}直接.{0,12}(帮我|给我)?(修|修复|改|处理|解决)/,
     /开始(改|做|实现|开发|落地)/,
+    /继续(改|做|实现|开发|落地|修|修复|处理|解决)/,
     /请(直接)?(实现|落地|修改|修复|处理|解决)/,
     /可以(执行|落地|实现|开发)/,
+    /去(改|做|实现|开发|落地|修|修复|处理|解决)吧/,
+    /那你去(改|做|实现|开发|落地|修|修复|处理|解决)吧/,
   ];
   const implementationConfirmationPatterns = [
     /确认.*(执行|落地|实现|继续|开发|修复|修改|处理|解决|改)/,
@@ -945,12 +967,22 @@ function analyzePromptIntent(prompt) {
   ];
   const readOnlyPatterns = [
     /看看/,
+    /你看/,
     /规划/,
     /分析/,
+    /先分析(一下)?/,
     /梳理/,
     /评估/,
     /怎么改/,
     /预计动哪些文件/,
+    /看(看)?(一下)?(原因|问题|风险|情况)/,
+    /什么原因/,
+    /怎么看/,
+    /你觉得/,
+    /可行吗/,
+    /有没有可能/,
+    /会有什么问题/,
+    /值不值得/,
     /review/i,
     /explain/i,
   ];
@@ -978,6 +1010,9 @@ function analyzePromptIntent(prompt) {
     && /(大|较大|比较大|明显|重做|重构|改版|优化|重新设计|设计方向|三种|3种|方案|效果图|先看样子|确认方向|体验优化|产品内)/i.test(text);
   const visualReview = /效果图|实现截图|视觉对比|视觉评审|对标效果图|复刻/i.test(text);
   const directBugfixExecution = explicitExecution && bugfixOrDiagnostic;
+  const requirementSignalMatched = requirementRoutingSignalsStrong.some((pattern) => pattern.test(text))
+    || (requirementRoutingSignalsWeak.some((pattern) => pattern.test(text))
+      && requirementChangeIntentSignals.some((pattern) => pattern.test(text)));
   const publicRepoResearchRequest = githubRepoPattern.test(text)
     && /(github|仓库|repo|项目|参考|对标|复刻|review|学习|架构|模块|流程|构建|测试|扩展点)/i.test(text);
   const externalTechResearchRequest = /(第三方|library|framework|sdk|api|mcp|cli|依赖|包|版本|迁移|弃用|官方文档|参数|返回值|生命周期)/i.test(text)
@@ -991,7 +1026,7 @@ function analyzePromptIntent(prompt) {
     && /(点击|输入|提交|登录|注销|退出|支付|关闭|send|submit|type|click|switch account|切换账号)/i.test(text);
   const productCopyRequest = /(文案|copy|错误文案|空状态|成功提示|按钮文案|提示语|toast|placeholder|设置项文案|国际化|i18n|locales|translations|localizable)/i.test(text);
   const requiresIntake = !internalOpenPrdExecution
-    && requirementRoutingSignals.some((pattern) => pattern.test(text))
+    && requirementSignalMatched
     && !tinyEditPatterns.some((pattern) => pattern.test(text))
     && !simpleConcrete
     && !visualMockupRequest
@@ -1673,8 +1708,7 @@ function runOpenPrd(args, cwd) {
   const result = spawnSync(command, args, {
     cwd,
     encoding: 'utf8',
-    timeout: 60000,
-    maxBuffer: 16 * 1024 * 1024,
+    timeout: 15000,
     env: process.env,
   });
   return {
@@ -1743,7 +1777,8 @@ function summarizeRunVerifyCheck(parsed, fallbackText = '') {
     return `run-verify: taskReady=no${failedTaskChecks.length ? ` (${failedTaskChecks.join(', ')})` : ''}`;
   }
   if (readiness.workspaceReady === false) {
-    return `run-verify: taskReady=yes, workspaceReady=no${workspaceWarnings.length ? ` (${workspaceWarnings[0]})` : ''}`;
+    const workspaceDetail = parsed.workspaceAttention?.summary ?? workspaceWarnings[0] ?? null;
+    return `run-verify: taskReady=yes, workspaceReady=no${workspaceDetail ? ` (${workspaceDetail})` : ''}`;
   }
   return 'run-verify: taskReady=yes, workspaceReady=yes';
 }
@@ -1790,7 +1825,11 @@ function buildGateFailureEnvelope(result) {
   if (runCheck?.workspaceReady === false) {
     return {
       kind: 'workspace-debt',
-      details: [runCheck.summary, ...(runCheck.warnings ?? [])].filter(Boolean),
+      details: [
+        runCheck.summary,
+        runCheck.workspaceAttention?.detail ?? null,
+        ...(runCheck.warnings ?? []),
+      ].filter(Boolean),
       repair: 'Repair path: resolve the workspace-level debt from openprd run . --verify or openprd quality . --verify, then retry this high-risk action.',
     };
   }
@@ -2039,7 +2078,7 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
         '代码修改完成后、最终回复前，针对本轮实际 touched code files 运行 openprd dev-check . <file...>；若出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，列出影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试。',
         '大界面改动进入实现前，先用 Codex Computer Use 截取产品内当前功能截图，再用 Codex 原生 Image 2 基于截图生成至少 3 个设计方向，横向拼接为一张带 1/2/3 序号的大图给用户确认；未确认方向前不要进入大 UI 实现。',
         '涉及界面、页面、视觉、样式或前端体验，且已经有效果图/设计稿/用户给图并进入实现阶段时，阶段性完成后必须截图并运行 openprd visual-compare . --reference <效果图> --actual <实现截图>；没有明确参考图但改动界面时，动手前先截修改前截图，完成后用同一入口、视口、账号和数据状态截修改后截图，并运行 openprd visual-compare . --before <修改前截图> --after <修改后截图>；默认输出 JPG 到 .openprd/harness/visual-reviews/。查看合成图后继续对标或自检，直到没有明显视觉差异或意外漂移。',
-        '发现可沉淀项时不要中途打断任务：工具识别补全和减少重复打扰的高置信低风险项可自动补齐；用户偏好、项目协作规矩和 OpenPrd 默认行为先记录为候选，收工时运行 openprd grow . --review 集中确认。',
+        '发现可沉淀项时不要中途打断任务：代码扩展识别这类白名单工具补全会自动应用并记录；用户偏好、项目协作规矩和 OpenPrd 默认行为先记录为候选，收工时运行 openprd grow . --review 集中确认。',
         '维护 OpenPrd 本身且涉及配置类能力时，先判断是否应纳入 openprd grow；高置信可成长默认纳入，不确定则主动询问用户。',
         '涉及后端、脚本、Agent、工具链、服务或数据处理变更时，把 CLI 与 API 视为同级接入面：同步检查命令入口、参数、输出契约、help/doctor/dry-run/status 与接口协议、返回结构、身份边界是否受影响，并更新 docs/basic/backend-structure.md 或明确写不适用原因。',
         '声明实现就绪前，先运行 openprd standards . --verify 和 openprd run . --verify。',
@@ -2057,7 +2096,7 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
       '代码修改完成后、最终回复前，针对本轮实际 touched code files 运行 openprd dev-check . <file...>；若出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，列出影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试。',
       '大界面改动进入实现前，先用 Codex Computer Use 截取产品内当前功能截图，再用 Codex 原生 Image 2 基于截图生成至少 3 个设计方向，横向拼接为一张带 1/2/3 序号的大图给用户确认；未确认方向前不要进入大 UI 实现。',
       '涉及界面、页面、视觉、样式或前端体验，且已经有效果图/设计稿/用户给图并进入实现阶段时，阶段性完成后必须截图并运行 openprd visual-compare . --reference <效果图> --actual <实现截图>；没有明确参考图但改动界面时，动手前先截修改前截图，完成后用同一入口、视口、账号和数据状态截修改后截图，并运行 openprd visual-compare . --before <修改前截图> --after <修改后截图>；默认输出 JPG 到 .openprd/harness/visual-reviews/。查看合成图后继续对标或自检，直到没有明显视觉差异或意外漂移。',
-      '发现可沉淀项时不要中途打断任务：工具识别补全和减少重复打扰的高置信低风险项可自动补齐；用户偏好、项目协作规矩和 OpenPrd 默认行为先记录为候选，收工时运行 openprd grow . --review 集中确认。',
+      '发现可沉淀项时不要中途打断任务：代码扩展识别这类白名单工具补全会自动应用并记录；用户偏好、项目协作规矩和 OpenPrd 默认行为先记录为候选，收工时运行 openprd grow . --review 集中确认。',
       '维护 OpenPrd 本身且涉及配置类能力时，先判断是否应纳入 openprd grow；高置信可成长默认纳入，不确定则主动询问用户。',
       '涉及后端、脚本、Agent、工具链、服务或数据处理变更时，把 CLI 与 API 视为同级接入面：同步检查命令入口、参数、输出契约、help/doctor/dry-run/status 与接口协议、返回结构、身份边界是否受影响，并更新 docs/basic/backend-structure.md 或明确写不适用原因。',
       '声明实现就绪前，先运行 openprd standards . --verify 和 openprd run . --verify。',
@@ -2078,7 +2117,7 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
     '需求类型由 $openprd-requirement-intake 按影响面、未知数、决策成本和验证成本判断：快速修正(L0)直接处理并事后说明，现有功能优化(L1)给对话内 mini-plan，新功能/新流程方案(L2)先走 PRD/review/change/tasks 并选择 base/consumer/b2b/agent PRD lens。只有在用户原始意图已明确要求实现，或后续明确发出执行指令时，才进入实现。',
     'OpenPrd 下一步只是建议。规划、分析、审查类请求保持只读；只有用户当前明确要求开发、深度调研、对标复刻或继续任务时才执行。',
     '代码修改完成后、最终回复前，针对本轮实际 touched code files 运行 openprd dev-check . <file...>；若出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，列出影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试。',
-    '发现可沉淀项时不要中途打断任务：工具识别补全和减少重复打扰的高置信低风险项可自动补齐；用户偏好、项目协作规矩和 OpenPrd 默认行为先记录为候选，收工时运行 openprd grow . --review 集中确认。',
+    '发现可沉淀项时不要中途打断任务：代码扩展识别这类白名单工具补全会自动应用并记录；用户偏好、项目协作规矩和 OpenPrd 默认行为先记录为候选，收工时运行 openprd grow . --review 集中确认。',
     '维护 OpenPrd 本身且涉及配置类能力时，先判断是否应纳入 openprd grow；高置信可成长默认纳入，不确定则主动询问用户。',
     '涉及后端、脚本、Agent、工具链、服务或数据处理变更时，把 CLI 与 API 视为同级接入面，并同步更新 docs/basic/backend-structure.md 或明确写不适用原因。',
     '声明就绪前请验证 docs/basic 标准。',
@@ -2201,6 +2240,7 @@ function runGateChecks(cwd, payload, risk) {
     taskReady: runTaskReady,
     workspaceReady: runWorkspaceReady,
     summary: summarizeRunVerifyCheck(runParsed, run.stdout || run.stderr),
+    workspaceAttention: runParsed?.workspaceAttention ?? null,
     warnings: Array.isArray(runParsed?.warnings) ? runParsed.warnings : [],
     errors: Array.isArray(runParsed?.errors) ? runParsed.errors : [],
     details: [
@@ -2492,7 +2532,7 @@ function handle(eventName, cwd, payload) {
       recordRunHook(root, baseEvent, 'allowed-medium-risk');
       updateHookState(root, baseEvent);
       recordTouchedFiles(root, payload);
-      return allowHook('OpenPrd 检测到写入动作。本轮写入完成后、最终回复前，请针对实际 touched code files 运行 openprd dev-check . <file...>；如出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，说明影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试；如涉及界面视觉且已有参考效果图并进入实现阶段，阶段性完成后运行 openprd visual-compare . --reference <效果图> --actual <实现截图> 并查看 JPG 对比图；如无参考图但改动界面，确认已先截修改前截图，并在完成后运行 openprd visual-compare . --before <修改前截图> --after <修改后截图> 查看 JPG 自检图；发现可沉淀项时不要中途打断任务，工具识别补全和减少重复打扰的高置信低风险项可自动补齐，用户偏好、项目协作规矩和 OpenPrd 默认行为留到收工时用 openprd grow . --review 集中确认；维护 OpenPrd 本身且涉及配置类能力时，先判断是否应纳入 openprd grow；声明就绪前，请同步维护 docs/basic、文件说明书、文件夹 README，以及相关 OpenPrd change/task 状态；如果涉及后端、脚本、Agent、工具链、服务或数据处理变更，还要把 CLI 与 API 视为同级接入面并更新 docs/basic/backend-structure.md。');
+      return allowHook('OpenPrd 检测到写入动作。本轮写入完成后、最终回复前，请针对实际 touched code files 运行 openprd dev-check . <file...>；如出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，说明影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试；如涉及界面视觉且已有参考效果图并进入实现阶段，阶段性完成后运行 openprd visual-compare . --reference <效果图> --actual <实现截图> 并查看 JPG 对比图；如无参考图但改动界面，确认已先截修改前截图，并在完成后运行 openprd visual-compare . --before <修改前截图> --after <修改后截图> 查看 JPG 自检图；发现可沉淀项时不要中途打断任务，代码扩展识别这类白名单工具补全会自动应用并记录，用户偏好、项目协作规矩和 OpenPrd 默认行为留到收工时用 openprd grow . --review 集中确认；维护 OpenPrd 本身且涉及配置类能力时，先判断是否应纳入 openprd grow；声明就绪前，请同步维护 docs/basic、文件说明书、文件夹 README，以及相关 OpenPrd change/task 状态；如果涉及后端、脚本、Agent、工具链、服务或数据处理变更，还要把 CLI 与 API 视为同级接入面并更新 docs/basic/backend-structure.md。');
     }
     return allowHook();
   }

@@ -182,7 +182,7 @@ const CANONICAL_SKILLS = [
       '- `openprd run . --context` 只是建议。规划、分析、review、影响范围说明等请求保持只读，除非当前用户消息明确要求开发、实现、继续任务、深度调研、对标复刻或 commit/push。',
       '- 用户给出会话 ID 并要求继续时，按工具无关的历史会话精确续接；不要要求或使用工具专属 ID；当前 active change、相似历史或 requirement gate 只能作为背景，不能替代该会话 ID。',
       '- 代码修改完成后、最终回复前，针对本轮实际 touched code files 运行 `openprd dev-check . <file...>` 或 `node scripts/openprd-dev-check.mjs . <file...>`；700 行以内正常，701-1500 行需注意，超过 1500 行警告。若出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，列出影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如 `🟠 中风险｜建议优先关注` 这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试。',
-      '- 执行中发现可沉淀项时，不要中途打断当前任务：高置信工具识别补全和减少重复打扰这类低风险项可自动补齐；用户偏好、项目协作规矩和 OpenPrd 默认行为先沉淀为 `.openprd/growth` 候选，收工时再集中运行 `openprd grow . --review` 请用户确认。',
+      '- 执行中发现可沉淀项时，不要中途打断当前任务：代码扩展识别这类白名单工具补全会自动应用并记录；用户偏好、项目协作规矩和 OpenPrd 默认行为先沉淀为 `.openprd/growth` 候选，收工时再集中运行 `openprd grow . --review` 请用户确认。',
       '- 维护 OpenPrd 本身时，只要新增或修改配置类能力（阈值、规则、识别、豁免、命令别名、环境差异、用户偏好或策略开关），都要做 grow-aware 自检：高置信应可成长时默认纳入 `openprd grow`；不确定时主动问用户；明确一次性或固定规则时才保持静态配置。',
       '- 只要实现新增或修改文件，就做文档影响检查；缺失的 `docs/basic/`、文件说明书和文件夹 README 要补齐，已有文档受影响时要更新。',
       '- 涉及后端、脚本、Agent、工具链、服务或数据处理变更时，把 CLI 与 API 视为同级接入面：检查命令入口、参数、输出契约、`help`、`doctor`、`dry-run`、`status` 与接口协议、返回结构、身份边界是否受影响，并同步更新 `docs/basic/backend-structure.md`；若某一面不适用也要明确写原因。',
@@ -213,7 +213,7 @@ const CANONICAL_SKILLS = [
       '1. 运行 `openprd doctor .`。',
       '2. 如果生成引导或 hooks 漂移，运行 `openprd update .`。',
       '3. 运行 `openprd standards . --verify` 并修复文档标准。',
-      '4. 运行 `openprd quality . --verify` 并审阅 HTML 质量评估报告；若 `productionReady=false`，最终回复必须列出缺证据或需关注的必需 EVO 门禁。',
+      '4. 运行 `openprd quality . --verify` 并审阅 HTML 质量评估报告；若 `productionReady=false`，最终回复必须先区分 `taskReady` 与 `workspaceReady`，再列出缺证据或需关注的必需 EVO 门禁；如果只剩 `feature-coverage`，说明是任务账本或覆盖证据未收口，不要把本次功能说成失败。',
       '5. 报告就绪前运行 `openprd validate .`。',
       '',
     ].join('\n'),
@@ -329,13 +329,13 @@ const CANONICAL_SKILLS = [
       '11. change/tasks 就绪后，用 `$openprd-test-strategy` 为每个任务确认 test-layer、test-size、test-scope、evidence-plan、升级原因或豁免原因；小改动从单测开始，触达契约、用户主路径、视觉、小程序、性能、安全或成本风险时升级验证层级。并且同步按 execution strategy 标注 `serial / parallel-workers / parallel-workers-isolated`、`write-scope`、`owner-role`、`local-verify` 和 `integration-owner`，让主 Agent 可以做 worker 分片和最终审查。',
       '12. 长程实现使用 `openprd loop . --plan --change <id>`，并且只有用户明确要求开发、继续任务、深度调研、对标复刻或 commit 时才执行单任务 fresh session。中等规模 L1/L2 任务可先用 `parallel-workers` 让主 Agent 分配多个 worker shard；达到长程阈值后再升级到隔离 loop 会话。',
       '13. 代码修改完成后、最终回复前，针对本轮实际 touched code files 运行 `openprd dev-check . <file...>` 或 `node scripts/openprd-dev-check.mjs . <file...>` 回顾行数状态：700 行以内正常，701-1500 行需注意，超过 1500 行警告。若出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，列出影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如 `🟠 中风险｜建议优先关注` 这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试；若只是窄 bugfix 或小修暂不拆，在表格里说明本次处理结果和后续建议。',
-      '14. 如果执行中发现新代码后缀、豁免路径、命令别名、项目约定或用户偏好，不要中途打断任务。工具识别能力补全和减少重复打扰的高置信低风险项可自动应用并记录；用户偏好、项目协作规矩和 OpenPrd 默认行为形成 growth candidate，收工时用 `openprd grow . --review` 集中确认。',
+      '14. 如果执行中发现新代码后缀、豁免路径、命令别名、项目约定或用户偏好，不要中途打断任务。代码扩展识别这类白名单工具补全会自动应用并记录；用户偏好、项目协作规矩和 OpenPrd 默认行为形成 growth candidate，收工时用 `openprd grow . --review` 集中确认。',
       '15. 维护 OpenPrd 本身时，只要新增或修改配置类能力（阈值、规则、识别、豁免、命令别名、环境差异、用户偏好或策略开关），默认先做 grow-aware 自检：高置信应可成长时直接纳入 `openprd grow` 体系；不确定时主动询问用户是否做成可成长配置。',
       '16. 实现过程中，每次新增或修改文件都做文档影响检查，补齐缺失的 `docs/basic/`、文件说明书和文件夹 README，并更新受影响文档；涉及后端、脚本、Agent、工具链、服务或数据处理变更时，把 CLI 与 API 视为同级接入面：同步检查命令入口、参数、输出契约、`help`、`doctor`、`dry-run`、`status` 与接口协议、返回结构、身份边界是否受影响，并更新 `docs/basic/backend-structure.md` 或明确写不适用原因。',
       '17. 用户要求生成图片、封面图、配图、海报、插画、图标、贴纸、头像、banner、主视觉/KV、运营图、效果图、视觉稿、mockup、先看样子或先确认设计方向时，默认直接调用 Codex 原生 Image 2 生图能力产出图片；对 logo、icon、avatar、badge 等开发素材，如果用户未明确要求 mockup、场景图、设备框、卡片承载、名片/包装展示或参考界面复刻，默认按独立素材输出（standalone asset）处理：使用全画布单主体，不额外添加 UI frame、卡片、设备壳、名片、桌面陈列、手持实拍或其他展示容器。只有当用户明确要求 mockup、场景化效果图、容器化呈现，或参考图本身包含这些结构时，才生成对应容器或场景；除非用户明确指定 HTML、SVG、CSS、Canvas、代码稿或可编辑矢量/source artifact，不要改用临时 HTML/SVG/CSS 再截图。OpenPrd 的 `review.html` 只用于需求评审，不能替代图片或效果图生成。',
       '18. 大界面改动进入实现前，必须先完成 3 方向效果图评审并获得用户确认；进入实现后，如果已经有效果图、设计稿、图片资产或用户给图，阶段性完成后先截实现图，再运行 `openprd visual-compare . --reference <效果图> --actual <实现截图>`。如果没有明确参考图但改动界面，动手前先截修改前截图，完成后用同一入口、视口、账号和数据状态截修改后截图，再运行 `openprd visual-compare . --before <修改前截图> --after <修改后截图>`。默认输出 JPG 到 `.openprd/harness/visual-reviews/`；查看合成图后继续复核，直到预期变化出现且未改区域没有明显漂移。',
       '19. 声称单个 task 完成前，运行本任务 verify/dev-check/必要界面验证，并通过 `--evidence`、测试报告或任务 metadata 留下 task-scoped evidence；不要把全局 `openprd run . --verify` 当作 per-task 默认。',
-      '20. 阶段收口、全部实现完成、handoff/commit/release/publish 前，运行 `openprd standards . --verify`、`openprd quality . --verify` 和 `openprd run . --verify`，把 HTML 质量评估报告当作整体 EVO 门禁、日志、业务成本与滥用护栏、测试策略矩阵、冒烟覆盖、性能、极端场景和项目知识的评审产物。',
+      '20. 阶段收口、全部实现完成、handoff/commit/release/publish 前，运行 `openprd standards . --verify`、`openprd quality . --verify` 和 `openprd run . --verify`，把 HTML 质量评估报告当作整体 EVO 门禁、日志、业务成本与滥用护栏、测试策略矩阵、冒烟覆盖、性能、极端场景和项目知识的评审产物；最终回复优先复用 `run . --verify` 的 `taskReady/workspaceReady` 拆分，不要把任务通过和工作区欠账混成一句泛化尾巴。',
       '21. `AGENTS.md` 只保留轻量合同；入口路由看 `$openprd-router`，具体命令速查看 `.openprd/harness/command-catalog.md`，更细的工作流步骤、路由边界和 hook 门禁以这份 skill、`$openprd-shared`、`$openprd-test-strategy` 和 `$openprd-benchmark-router` 为准。',
       '22. hook 会强制阻断几类场景：需求入口未完成就写实现、外部证据不足就直接改第三方集成、skill/AGENTS 变更未先可视化确认、以及敏感信息场景下直接读原始 vault 文件。',
       '',
@@ -346,7 +346,7 @@ const CANONICAL_SKILLS = [
       '- 面对“看看、规划、梳理、分析、评估、怎么改、预计动哪些文件、review、explain”等只读意图，不运行 OpenPrd 写入命令。',
       '- 现有项目需求仍模糊时，优先 discovery，再考虑 synthesize。',
       '- 进入定稿或交接前，运行 `openprd run . --verify` 并确认 review blocker 已关闭。',
-      '- 声称实现就绪前，审阅最新 `.openprd/quality/reports/*.html` HTML 质量评估报告；`productionReady=false` 时不得宣称就绪。',
+      '- 声称实现就绪前，审阅最新 `.openprd/quality/reports/*.html` HTML 质量评估报告；若 `taskReady=true` 且 `workspaceReady=false`，先明确写“当前任务通过，工作区待关注”，再列出缺证据或待关注门禁；如果只剩 `feature-coverage`，说明是任务账本或覆盖证据未收口，不要把本次功能表述成失败。',
       '- accepted spec 推进前，先运行 `openprd change . --validate --change <id>`。',
       '',
       '## hook 驱动循环',
@@ -408,7 +408,7 @@ const CANONICAL_SKILLS = [
       '报告实现就绪前，先运行 `openprd standards . --verify`。',
       '对包含源码文件的项目，这个门禁还要求 `docs/basic/` 内容具体可用、文件头说明书存在，以及 `[project]_[folder]_README.md` 文件夹说明完整；如果涉及后端实现，`docs/basic/backend-structure.md` 还必须显式覆盖 CLI 接入面和 API 接入面，或写明不适用原因。',
       '研发期代码修改完成后、最终回复前，运行 `openprd dev-check . <file...>` 或 `node scripts/openprd-dev-check.mjs . <file...>`；该标准层只检查本轮实际 touched code files 的行数状态，不替代 `standards --verify`；需要关注的文件会提供“后续建议”表格行，最终回复应按 🔴 → 🟠 → 🟡 的顺序呈现。',
-      '当 dev-check 高置信识别出新的代码扩展名时，可自动补齐识别规则并记录；豁免路径、项目规矩、用户偏好或 OpenPrd 默认行为只作为候选留到收工复盘，用 `openprd grow . --review` 集中确认。',
+      '当 dev-check 识别出新的代码扩展名时，会自动补齐识别规则并记录；豁免路径、项目规矩、用户偏好或 OpenPrd 默认行为只作为候选留到收工复盘，用 `openprd grow . --review` 集中确认。',
       '维护 OpenPrd 本身时，新增或修改任何配置类能力都要检查是否应该成为 grow-aware 配置：高置信可复用、可被用户习惯影响、会随项目环境变化的配置默认纳入 `openprd grow`；不确定时主动询问用户；一次性固定规则才保留为静态配置。',
       '',
       '## 文档影响检查',
@@ -550,7 +550,7 @@ const CANONICAL_SKILLS = [
       '',
       '## 就绪规则',
       '',
-      '- `openprd run . --verify` 中只要质量报告 `productionReady=false`，就不能宣称整体就绪。',
+      '- `openprd run . --verify` 若显示 `taskReady=true` 且 `workspaceReady=false`，不能宣称整体工作区就绪；先明确区分“当前任务通过，工作区待关注”，再列出未通过门禁。若只剩 `feature-coverage`，说明是任务账本或覆盖证据未收口，不要把本次功能表述成失败。',
       '- 大界面改动缺少实现前 3 方向效果图评审或用户未确认方向时，不要进入大 UI 实现；UI 任务有参考图但缺少 visual-compare 输出时，不要宣称视觉实现完成；无参考图的 UI 改动缺少修改前后截图对比时，不要宣称视觉自检完成；如果对比图仍有明显偏差或漂移，先返工而不是把差异留给用户发现。',
       '- 最终回复必须列出未通过的必需 EVO 门禁；场景可选门禁可以说明为 advisory，但不能混同为已通过。',
       '',
@@ -609,7 +609,7 @@ const CANONICAL_COMMANDS = [
     id: 'grow',
     title: 'OpenPrd Grow',
     body: [
-      'Treat grow as an end-of-task review layer, not an in-task interruption. Auto-apply high-confidence low-risk tool-recognition fixes such as code-extension detection; queue user preferences, project governance rules, and OpenPrd default behavior as candidates, then run `openprd grow . --review` at wrap-up for user confirmation.',
+      'Treat grow as an end-of-task review layer, not an in-task interruption. Auto-apply whitelisted tool-recognition fixes such as detected code extensions; queue user preferences, project governance rules, and OpenPrd default behavior as candidates, then run `openprd grow . --review` at wrap-up for user confirmation.',
     ].join('\n'),
   },
   {
@@ -638,7 +638,7 @@ const CANONICAL_COMMANDS = [
     id: 'verify',
     title: 'OpenPrd Verify',
     body: [
-      'Run `openprd run . --verify`. It verifies standards, workspace validation, the currently focused change structure (not just the global active change), and active discovery state, then reports `taskReady` separately from `workspaceReady`.',
+      'Run `openprd run . --verify`. It verifies standards, workspace validation, the currently focused change structure (not just the global active change), and active discovery state, then reports `taskReady` separately from `workspaceReady`. When `taskReady=true` and `workspaceReady=false`, final reporting must preserve that split; if the only attention gate is `feature-coverage`, describe it as task-ledger or evidence debt rather than a failed implementation.',
     ].join('\n'),
   },
   {
@@ -720,7 +720,7 @@ function renderCommandCatalog() {
     '## 状态与修复',
     '',
     '- `openprd run . --context`：读取 hook-stable 建议上下文；它是建议，不是自动执行指令。续做历史任务或按用户描述找对应需求/任务时，可带 `--message <用户原话>` 先解析显式目标。',
-    '- `openprd run . --verify`：校验当前 run 门禁，并把 `taskReady` 与 `workspaceReady` 分开报告。',
+    '- `openprd run . --verify`：校验当前 run 门禁，并把 `taskReady` 与 `workspaceReady` 分开报告；如果只剩 `feature-coverage`，表示任务账本或覆盖证据待收口，不等于本次功能失败。',
     '- `openprd doctor .`：检查生成引导、hooks、skills、standards 与验证健康度；`--tools codex` 还会检查 `codex --version`。',
     '- `openprd doctor . --tools codex --fix`：在用户明确同意后运行 `npm install -g @openai/codex@latest`，并在安装后复查 Codex CLI。',
     '- `openprd update .`：修复生成引导、skills、hooks 与 drift。',
@@ -1064,7 +1064,7 @@ function agentContractBody() {
     '### High-Risk Gate',
     '',
     'Before freeze, handoff, accepted spec apply/archive, commit, push, release, or publish, ensure `openprd standards . --verify`, `openprd quality . --verify`, `openprd run . --verify`, and `openprd doctor .` are healthy.',
-    'If the quality report says `productionReady=false`, do not claim readiness; list the missing evidence or gates.',
+    'If the quality report says `productionReady=false`, do not claim overall readiness. Reuse `openprd run . --verify` to separate current-task status from workspace-level debt, list the missing evidence or gates, and when only `feature-coverage` is pending describe it as task-ledger or evidence debt rather than a failed implementation.',
     'The only baseline documentation path is `docs/basic/`.',
     '',
   ].join('\n');
@@ -1207,8 +1207,9 @@ function quoteShell(value, options = {}) {
   if (resolveShellPlatform(options) === 'win32') {
     return `"${String(value).replace(/"/g, '""')}"`;
   }
-  return `'${String(value).replace(/'/g, `'\''`)}'`;
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
+
 function renderCodexHookRunner() {
   return readFileSync(cjoin(PACKAGE_ROOT, 'src', 'codex-hook-runner-template.mjs'), 'utf8').trimEnd();
 }

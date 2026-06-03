@@ -1,4 +1,9 @@
 import test from 'node:test';
+import {
+  buildCodeExtensionCandidate,
+  initGrowthWorkspace,
+  observeGrowthWorkspace,
+} from '../src/growth.js';
 
 import {
   assert,
@@ -11,7 +16,6 @@ import {
   renderReviewArtifact,
   addBenchmarkWorkspace,
   advanceOpenSpecTaskWorkspace,
-  applyGrowthCandidateWorkspace,
   applyOpenPrdChangeWorkspace,
   approveBenchmarkWorkspace,
   archiveOpenPrdChangeWorkspace,
@@ -90,7 +94,7 @@ import {
   writeValidReviewPresentation,
   synthesizeWorkspace,
   writeMinimalChange,
-} from './helpers/openprd-test-helpers.js';
+} from 'openprd-test-helpers';
 test('quality verify writes html eval report and learn creates experience skill', async () => {
   const project = await makeTempProject();
   await initWorkspace(project, { templatePack: 'agent' });
@@ -418,8 +422,79 @@ test('quality requires current smoke evidence and run verify separates task read
   assert.equal(qualityCheck.ok, false);
   assert.equal(qualityCheck.productionReady, false);
   assert.equal(verified.errors.length, 0);
-  assert.ok(verified.warnings.some((warning) => warning.includes('production-ready')));
-  assert.ok(qualityCheck.errors.some((error) => error.includes('production-ready')));
+  assert.ok(verified.warnings.some((warning) => warning.includes('quality still needs evidence for: smoke')));
+  assert.ok(qualityCheck.errors.some((error) => error.includes('quality still needs evidence for: smoke')));
+});
+
+test('run verify describes feature-coverage debt as task ledger attention instead of task failure', async () => {
+  const project = await makeTempProject();
+  await initWorkspace(project, { templatePack: 'consumer' });
+  await fs.writeFile(path.join(project, 'package.json'), `${JSON.stringify({
+    type: 'module',
+    scripts: {
+      'test:smoke': 'node --test smoke.test.js',
+    },
+  }, null, 2)}\n`);
+  await fs.mkdir(path.join(project, '.openprd', 'quality', 'evidence'), { recursive: true });
+  await fs.writeFile(path.join(project, '.openprd', 'quality', 'evidence', 'smoke.md'), [
+    '# smoke evidence',
+    '',
+    '- smoke: passed main flow.',
+    '',
+  ].join('\n'));
+  await writeMinimalChange(project, 'ledger-gap', {
+    title: 'Ledger Gap',
+    requirementTitle: 'Ledger gap follow-up',
+    taskTitle: 'Close the remaining feature coverage ledger',
+  });
+  await fs.writeFile(path.join(project, 'openprd', 'changes', 'ledger-gap', 'tasks.md'), [
+    '# Tasks',
+    '',
+    '- [x] T001.01 Ship the current endpoint',
+    '  - type: implementation',
+    '  - done: endpoint is implemented and locally verified',
+    '  - verify: pnpm test:smoke',
+    '- [ ] T001.02 Record the remaining coverage evidence',
+    '  - type: governance',
+    '  - done: feature coverage evidence is recorded for the remaining task',
+    '  - verify: openprd tasks . --change ledger-gap --advance --verify --item T001.02',
+    '',
+  ].join('\n'));
+  await fs.writeFile(path.join(project, 'openprd', 'changes', 'ledger-gap', 'specs', 'ledger-gap', 'spec.md'), [
+    '## ADDED Requirements',
+    '',
+    '### Requirement: Ledger gap follow-up',
+    'The remaining feature coverage evidence must be recorded before workspace-wide readiness is claimed.',
+    '',
+    '#### Scenario: Coverage ledger remains pending',
+    '- **WHEN** implementation is complete but one task ledger entry is still pending',
+    '- **THEN** run verify reports task readiness separately from workspace attention',
+    '',
+  ].join('\n'));
+  await fs.writeFile(path.join(project, '.openprd', 'state', 'changes.json'), `${JSON.stringify({
+    version: 1,
+    activeChange: 'ledger-gap',
+    changes: {
+      'ledger-gap': { id: 'ledger-gap', status: 'active' },
+    },
+  }, null, 2)}\n`);
+
+  const quality = await verifyQualityWorkspace(project);
+  assert.equal(quality.report.readiness.productionReady, false);
+  assert.deepEqual(quality.report.readiness.attentionGates, ['feature-coverage']);
+
+  const verified = await runWorkspace(project, { verify: true });
+  const qualityCheck = verified.checks.find((check) => check.name === 'quality');
+  assert.equal(verified.ok, true);
+  assert.equal(verified.readiness.taskReady, true);
+  assert.equal(verified.readiness.workspaceReady, false);
+  assert.equal(qualityCheck.ok, false);
+  assert.equal(verified.workspaceAttention?.kind, 'feature-coverage-ledger');
+  assert.equal(verified.workspaceAttention?.activeChange, 'ledger-gap');
+  assert.equal(verified.workspaceAttention?.pending, 1);
+  assert.ok(verified.workspaceAttention?.detail.includes('task bookkeeping or coverage evidence is incomplete'));
+  assert.ok(verified.warnings.some((warning) => warning.includes('task bookkeeping or coverage evidence is incomplete')));
+  assert.ok(qualityCheck.errors.some((error) => error.includes('task bookkeeping or coverage evidence is incomplete')));
 });
 
 test('quality requires reference-driven visual evidence for frontend changes', async () => {
@@ -598,7 +673,7 @@ test('high-risk hook blocks on workspace debt without reframing it as task failu
   const hookPayload = JSON.parse(hookResult.stdout);
   assert.equal(hookPayload.decision, 'block');
   assert.ok(hookPayload.reason.includes('workspace is not fully ready'));
-  assert.ok(hookPayload.reason.includes('Quality report is not production-ready'));
+  assert.ok(hookPayload.reason.includes('quality attention gates: smoke'));
   assert.ok(hookPayload.reason.includes('resolve the workspace-level debt'));
 });
 
@@ -1103,7 +1178,7 @@ test('visual-compare writes side-by-side review images', async () => {
   assert.equal((await sharp(beforeAfterCliOut).metadata()).format, 'jpeg');
 });
 
-test('dev-check auto-applies high-confidence unknown code extensions', async () => {
+test('dev-check auto-applies detected unknown code extensions', async () => {
   const project = await makeTempProject();
   await initWorkspace(project, { templatePack: 'consumer' });
   await fs.mkdir(path.join(project, 'src'), { recursive: true });
@@ -1167,7 +1242,7 @@ test('dev-check auto-applies high-confidence unknown code extensions', async () 
   assert.equal(cliResult.summary.applied, 1);
 });
 
-test('dev-check keeps low-confidence unknown code extensions for wrap-up review', async () => {
+test('dev-check also auto-applies low-confidence unknown code extensions', async () => {
   const project = await makeTempProject();
   await initWorkspace(project, { templatePack: 'consumer' });
   await fs.mkdir(path.join(project, 'src'), { recursive: true });
@@ -1183,12 +1258,13 @@ test('dev-check keeps low-confidence unknown code extensions for wrap-up review'
   assert.equal(result.files[0].status, 'ok');
   assert.equal(result.files[0].fileKind, 'candidate-code');
   assert.equal(result.files[0].growthCandidate.id, 'code-extension-tpl');
-  assert.equal(result.files[0].growthObservation.autoApplied, false);
-  assert.match(result.files[0].nextAction, /收工复盘/);
+  assert.equal(result.files[0].growthObservation.autoApplied, true);
+  assert.match(result.files[0].nextAction, /已自动补齐 \.tpl/);
 
   const review = await reviewGrowthWorkspace(project);
-  assert.equal(review.summary.pending, 1);
-  assert.equal(review.pending[0].id, 'code-extension-tpl');
+  assert.equal(review.summary.pending, 0);
+  assert.equal(review.summary.applied, 1);
+  assert.equal(review.applied[0].id, 'code-extension-tpl');
 
   const reviewLogs = [];
   const originalLog = console.log;
@@ -1199,18 +1275,9 @@ test('dev-check keeps low-confidence unknown code extensions for wrap-up review'
     console.log = originalLog;
   }
   const reviewText = reviewLogs.join('\n');
-  assert.match(reviewText, /状态: 待确认/);
-  assert.match(reviewText, /作用范围: 项目共享规则/);
-  assert.match(reviewText, /置信度: \d+%/);
-  assert.match(reviewText, /采纳影响: 会把匹配 \.tpl 的文件纳入代码文件识别/);
-  assert.match(reviewText, /证据:/);
-  assert.match(reviewText, /src\/maybe\.tpl.*原因:/);
-  assert.match(reviewText, /\.openprd\/standards\/config\.json -> developmentStandards\.codeFileLines\.codeFileExtensions append "\.tpl"/);
-  assert.match(reviewText, /收工复盘采纳命令: openprd grow \. --apply --id code-extension-tpl/);
-  assert.match(reviewText, /拒绝命令: openprd grow \. --reject --id code-extension-tpl/);
+  assert.doesNotMatch(reviewText, /状态: 待确认/);
+  assert.match(reviewText, /候选: 0 待确认，1 已应用，0 已拒绝。/);
 
-  const applyResult = await applyGrowthCandidateWorkspace(project, { id: 'code-extension-tpl' });
-  assert.equal(applyResult.ok, true);
   const standardsConfig = JSON.parse(await fs.readFile(path.join(project, '.openprd', 'standards', 'config.json'), 'utf8'));
   assert.deepEqual(standardsConfig.developmentStandards.codeFileLines.codeFileExtensions, ['.tpl']);
 
@@ -1228,7 +1295,39 @@ test('dev-check keeps low-confidence unknown code extensions for wrap-up review'
     console.log = originalLog;
   }
   const cliResult = JSON.parse(logs.join('\n'));
+  assert.equal(cliResult.summary.pending, 0);
   assert.equal(cliResult.summary.applied, 1);
+});
+
+test('growth init reconciles older pending code-extension candidates into auto-applied state', async () => {
+  const project = await makeTempProject();
+  await initWorkspace(project, { templatePack: 'consumer' });
+
+  const candidate = buildCodeExtensionCandidate('README.md', {
+    lineCount: 10,
+    confidence: 0.55,
+    reason: 'code-punctuation',
+  });
+  const observed = await observeGrowthWorkspace(project, candidate, {
+    autoApply: { enabled: false, safeTypes: ['code-extension'] },
+  });
+  assert.equal(observed.autoApplied, false);
+
+  const before = await reviewGrowthWorkspace(project);
+  assert.equal(before.summary.pending, 1);
+  assert.equal(before.pending[0].id, 'code-extension-md');
+
+  const growth = await initGrowthWorkspace(project);
+  assert.equal(growth.reconciledAutoApplied.length, 1);
+  assert.equal(growth.reconciledAutoApplied[0].id, 'code-extension-md');
+
+  const after = await reviewGrowthWorkspace(project);
+  assert.equal(after.summary.pending, 0);
+  assert.equal(after.summary.applied, 1);
+  assert.equal(after.applied[0].applyMode, 'auto');
+
+  const standardsConfig = JSON.parse(await fs.readFile(path.join(project, '.openprd', 'standards', 'config.json'), 'utf8'));
+  assert.deepEqual(standardsConfig.developmentStandards.codeFileLines.codeFileExtensions, ['.md']);
 });
 
 test('standards ignore non-owned generated and marketplace source trees', async () => {

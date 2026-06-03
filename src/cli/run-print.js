@@ -64,6 +64,7 @@ function printRunResult(result, json) {
   if (result.action === 'run-verify') {
     const taskReady = result.readiness?.taskReady !== false;
     const workspaceReady = result.readiness?.workspaceReady !== false;
+    const workspaceAttention = result.workspaceAttention ?? null;
     const status = taskReady
       ? (workspaceReady ? '通过' : '当前任务通过，工作区待关注')
       : '当前任务失败';
@@ -82,10 +83,26 @@ function printRunResult(result, json) {
         : '';
       console.log(`- ${check.ok ? '通过' : '失败'}: ${check.name} [${scope}]${detail}`);
     }
+    if (workspaceAttention?.kind === 'feature-coverage-ledger') {
+      const changeLabel = workspaceAttention.activeChange
+        ? `激活变更 ${workspaceAttention.activeChange}`
+        : '当前激活任务';
+      const progress = workspaceAttention.total > 0
+        ? `${workspaceAttention.done}/${workspaceAttention.total}`
+        : `${workspaceAttention.done}`;
+      console.log('工作区待关注原因: feature-coverage 账本未收口');
+      console.log(`- ${changeLabel} 已完成 ${progress}，待处理 ${workspaceAttention.pending}${workspaceAttention.blocked > 0 ? `，阻塞 ${workspaceAttention.blocked}` : ''}`);
+      console.log('- 这通常表示任务账本或覆盖证据还没补齐，不等于本次功能失败。');
+    } else if (workspaceAttention?.summary) {
+      console.log(`工作区待关注原因: ${workspaceAttention.summary}`);
+    }
     printKnowledgeReview(result.knowledgeReview);
-    if (result.warnings.length > 0) {
+    const extraWarnings = workspaceAttention?.detail
+      ? result.warnings.filter((warning) => warning !== `quality: ${workspaceAttention.detail}`)
+      : result.warnings;
+    if (extraWarnings.length > 0) {
       console.log('工作区待关注:');
-      for (const warning of result.warnings) {
+      for (const warning of extraWarnings) {
         console.log(`- ${warning}`);
       }
     }

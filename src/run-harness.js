@@ -1682,6 +1682,51 @@ async function verifyRunWorkspace(projectRoot, dependencies, options = {}) {
     verifyOpenSpecDiscoveryWorkspace,
     verifyQualityWorkspace,
   } = dependencies;
+  const summarizeWorkspaceAttention = (quality) => {
+    const report = quality?.report ?? null;
+    const attentionGates = Array.isArray(report?.readiness?.attentionGates)
+      ? report.readiness.attentionGates.filter(Boolean)
+      : [];
+    const activeTasks = report?.evalHarness?.featureCoverage?.activeTasks ?? null;
+    if (attentionGates.length === 1 && attentionGates[0] === 'feature-coverage' && activeTasks?.pending > 0) {
+      const activeChange = activeTasks.activeChange ?? null;
+      const total = Number(activeTasks.total ?? 0);
+      const done = Number(activeTasks.done ?? 0);
+      const pending = Number(activeTasks.pending ?? 0);
+      const blocked = Number(activeTasks.blocked ?? 0);
+      const progress = total > 0 ? `${done}/${total}` : `${done}`;
+      const changeLabel = activeChange ? `active change ${activeChange}` : 'the active task ledger';
+      return {
+        kind: 'feature-coverage-ledger',
+        gate: 'feature-coverage',
+        gates: attentionGates,
+        activeChange,
+        total,
+        done,
+        pending,
+        blocked,
+        summary: 'feature-coverage ledger remains open',
+        detail: `${changeLabel} still has ${pending} pending tasks (${progress} done)${blocked > 0 ? `, with ${blocked} blocked` : ''}. This usually means task bookkeeping or coverage evidence is incomplete, not that the current implementation failed.`,
+      };
+    }
+    if (attentionGates.length > 0) {
+      return {
+        kind: 'quality-gates',
+        gates: attentionGates,
+        summary: `quality attention gates: ${attentionGates.join(', ')}`,
+        detail: `Current task verification passed, but workspace-level quality still needs evidence for: ${attentionGates.join(', ')}.`,
+      };
+    }
+    if (quality?.report?.readiness?.productionReady === false) {
+      return {
+        kind: 'quality-readiness',
+        gates: [],
+        summary: 'quality report is not production-ready',
+        detail: 'Current task verification passed, but the workspace-level quality report still needs attention before overall readiness can be claimed.',
+      };
+    }
+    return null;
+  };
   const context = await buildRunContext(projectRoot, dependencies, options);
   const standards = await checkStandardsWorkspace(projectRoot);
   const validation = await validateWorkspace(projectRoot).then(({ report }) => report);
@@ -1695,9 +1740,12 @@ async function verifyRunWorkspace(projectRoot, dependencies, options = {}) {
       errors: [error instanceof Error ? error.message : String(error)],
     }));
     const productionReady = quality.report?.readiness?.productionReady ?? null;
+    const workspaceAttention = summarizeWorkspaceAttention(quality);
     const qualityErrors = [
       ...(quality.errors ?? []),
-      ...(productionReady === false ? ['Quality report is not production-ready. Review required gates and evidence before claiming readiness.'] : []),
+      ...(productionReady === false
+        ? [workspaceAttention?.detail ?? 'Quality report is not production-ready. Review required gates and evidence before claiming readiness.']
+        : []),
     ];
     checks.push({
       name: 'quality',
@@ -1708,6 +1756,7 @@ async function verifyRunWorkspace(projectRoot, dependencies, options = {}) {
       htmlPath: quality.htmlPath ?? null,
       productionReady,
       attentionGates: quality.report?.readiness?.attentionGates ?? [],
+      workspaceAttention,
     });
   }
   const changeToVerify = context.focus?.changeId ?? context.recommendation?.changeId ?? context.activeChange ?? null;
@@ -1723,8 +1772,16 @@ async function verifyRunWorkspace(projectRoot, dependencies, options = {}) {
   const workspaceChecks = checks;
   const taskReady = taskChecks.every((check) => check.ok);
   const workspaceReady = workspaceChecks.every((check) => check.ok);
-  const ok = taskReady;
   const qualityCheck = checks.find((check) => check.name === 'quality');
+  const workspaceAttention = taskReady && !workspaceReady
+    ? (qualityCheck?.workspaceAttention ?? {
+      kind: 'workspace-checks',
+      checks: workspaceChecks.filter((check) => !check.ok).map((check) => check.name),
+      summary: `workspace attention: ${workspaceChecks.filter((check) => !check.ok).map((check) => check.name).join(', ')}`,
+      detail: `Current task verification passed, but workspace-level checks still need attention: ${workspaceChecks.filter((check) => !check.ok).map((check) => check.name).join(', ')}.`,
+    })
+    : null;
+  const ok = taskReady;
   const readiness = {
     taskReady,
     workspaceReady,
@@ -1739,8 +1796,9 @@ async function verifyRunWorkspace(projectRoot, dependencies, options = {}) {
     workspaceReady,
     productionReady: qualityCheck?.productionReady ?? null,
     attentionGates: qualityCheck?.attentionGates ?? [],
+    workspaceAttentionKind: workspaceAttention?.kind ?? null,
     summary: taskReady
-      ? (workspaceReady ? 'run verify passed' : `run verify task-ready with workspace attention: ${workspaceChecks.filter((check) => !check.ok).map((check) => check.name).join(', ')}`)
+      ? (workspaceReady ? 'run verify passed' : `run verify task-ready with workspace attention: ${workspaceAttention?.summary ?? workspaceChecks.filter((check) => !check.ok).map((check) => check.name).join(', ')}`)
       : `run verify failed: ${taskChecks.filter((check) => !check.ok).map((check) => check.name).join(', ')}`,
   };
   await recordKnowledgeReviewSignal(projectRoot, knowledgeSignal).catch(() => null);
@@ -1775,6 +1833,7 @@ async function verifyRunWorkspace(projectRoot, dependencies, options = {}) {
     context,
     checks,
     readiness,
+    workspaceAttention,
     warnings,
     knowledgeReview,
     errors,

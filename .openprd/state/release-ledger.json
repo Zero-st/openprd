@@ -2,7 +2,7 @@
   "version": 1,
   "enabled": true,
   "strategy": "semver",
-  "currentVersion": "0.1.3",
+  "currentVersion": "0.1.4",
   "versions": [
     {
       "version": "0.1.2",
@@ -82,9 +82,9 @@
     },
     {
       "version": "0.1.3",
-      "status": "current",
+      "status": "released",
       "createdAt": "2026-06-03 01:00:00",
-      "updatedAt": "2026-06-03 01:00:00",
+      "updatedAt": "2026-06-03 12:53:20",
       "notes": null,
       "items": [
         {
@@ -111,8 +111,51 @@
         }
       ],
       "tag": null
+    },
+    {
+      "version": "0.1.4",
+      "status": "current",
+      "createdAt": "2026-06-03 12:53:20",
+      "updatedAt": "2026-06-03 12:53:20",
+      "notes": null,
+      "items": [
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "run verify 在 taskReady 与 workspaceReady 之间做明确拆分",
+          "sentence": "优化：run verify 在 taskReady 与 workspaceReady 之间做明确拆分",
+          "recordedAt": "2026-06-03 12:53:20",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780462400734"
+          }
+        },
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "feature-coverage 待补时改为任务账本或覆盖证据未收口，不再把本次实现说成失败",
+          "sentence": "优化：feature-coverage 待补时改为任务账本或覆盖证据未收口，不再把本次实现说成失败",
+          "recordedAt": "2026-06-03 12:53:20",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780462400854"
+          }
+        },
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "高风险 hook、AGENTS、skills 与 command catalog 复用同一套 workspace debt 话术",
+          "sentence": "优化：高风险 hook、AGENTS、skills 与 command catalog 复用同一套 workspace debt 话术",
+          "recordedAt": "2026-06-03 12:53:20",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780462400978"
+          }
+        }
+      ],
+      "tag": null
     }
   ],
   "createdAt": "2026-06-02 21:28:04",
-  "updatedAt": "2026-06-03 01:00:00"
+  "updatedAt": "2026-06-03 12:53:20"
 }

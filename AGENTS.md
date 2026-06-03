@@ -42,6 +42,6 @@
 ### High-Risk Gate
 
 Before freeze, handoff, accepted spec apply/archive, commit, push, release, or publish, ensure `openprd standards . --verify`, `openprd quality . --verify`, `openprd run . --verify`, and `openprd doctor .` are healthy.
-If the quality report says `productionReady=false`, do not claim readiness; list the missing evidence or gates.
+If the quality report says `productionReady=false`, do not claim overall readiness. Reuse `openprd run . --verify` to separate current-task status from workspace-level debt, list the missing evidence or gates, and when only `feature-coverage` is pending describe it as task-ledger or evidence debt rather than a failed implementation.
 The only baseline documentation path is `docs/basic/`.
 <!-- OPENPRD:AGENTS:END -->

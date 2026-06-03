@@ -90,12 +90,14 @@ import {
   writeValidReviewPresentation,
   synthesizeWorkspace,
   writeMinimalChange,
-} from './helpers/openprd-test-helpers.js';
+} from 'openprd-test-helpers';
 test('setup enables Codex hooks while preserving user hook groups', async () => {
   const project = await makeTempProject();
   const codexHome = path.join(project, 'codex-home');
   const previousCodexHome = process.env.OPENPRD_CODEX_HOME;
+  const previousOpenPrdHome = process.env.OPENPRD_HOME;
   process.env.OPENPRD_CODEX_HOME = codexHome;
+  process.env.OPENPRD_HOME = path.join(project, 'openprd-home');
   await fs.mkdir(path.join(project, '.codex'), { recursive: true });
   await fs.writeFile(path.join(project, '.codex', 'hooks.json'), JSON.stringify({
     PostToolUse: [
@@ -159,6 +161,8 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.ok(generatedAgents.includes('### Entry Points'));
     assert.ok(generatedAgents.includes('$openprd-requirement-intake'));
     assert.ok(generatedAgents.includes('### Hook-Enforced Gates'));
+    assert.ok(generatedAgents.includes('separate current-task status from workspace-level debt'));
+    assert.ok(generatedAgents.includes('when only `feature-coverage` is pending'));
     assert.ok(generatedAgents.includes('secrets-vault'));
     assert.ok(generatedAgents.includes('weapp-dev-mcp'));
     assert.ok(generatedAgents.includes('resolve_library_id -> query_docs'));
@@ -197,6 +201,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.ok(generatedCommandCatalog.includes('openprd visual-compare . --reference <效果图> --actual <实现截图>'));
     assert.ok(generatedCommandCatalog.includes('openprd visual-compare . --before <修改前截图> --after <修改后截图>'));
     assert.ok(generatedCommandCatalog.includes('openprd quality . --verify'));
+    assert.ok(generatedCommandCatalog.includes('如果只剩 `feature-coverage`'));
     const generatedBenchmarkSkill = await fs.readFile(path.join(project, '.codex', 'skills', 'openprd-benchmark-router', 'SKILL.md'), 'utf8');
     assert.ok(generatedBenchmarkSkill.includes('## Source Map'));
     assert.ok(generatedBenchmarkSkill.includes('Superpowers'));
@@ -238,7 +243,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.ok(generatedSharedSkill.includes('彩色 Mermaid'));
     assert.ok(generatedSharedSkill.includes('不要中途打断当前任务'));
     assert.ok(generatedSharedSkill.includes('README_EN.md'));
-    assert.ok(generatedSharedSkill.includes('高置信工具识别补全'));
+    assert.ok(generatedSharedSkill.includes('代码扩展识别这类白名单工具补全'));
     assert.ok(generatedSharedSkill.includes('optionalCapabilities'));
     assert.ok(generatedSharedSkill.includes('非阻断式增强建议'));
     const generatedHarnessSkill = await fs.readFile(path.join(project, '.codex', 'skills', 'openprd-harness', 'SKILL.md'), 'utf8');
@@ -254,7 +259,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.ok(generatedSharedSkill.includes('左侧标注“效果图”'));
     assert.ok(generatedSharedSkill.includes('修改前 / 修改后'));
     assert.ok(generatedHarnessSkill.includes('代码修改完成后、最终回复前'));
-    assert.ok(generatedHarnessSkill.includes('工具识别能力补全'));
+    assert.ok(generatedHarnessSkill.includes('代码扩展识别这类白名单工具补全'));
     assert.ok(generatedHarnessSkill.includes('收工时用 `openprd grow . --review`'));
     assert.ok(generatedHarnessSkill.includes('主动询问用户是否做成可成长配置'));
     assert.ok(generatedHarnessSkill.includes('业务和产品语言'));
@@ -316,6 +321,11 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
         dependencyOrder: 'dependencies must appear before dependents',
       },
     }, null, 2)}\n`);
+    await fs.mkdir(path.join(project, 'docs', 'basic'), { recursive: true });
+    await writeConcreteBasicDocs(project);
+    await fs.mkdir(path.join(project, 'src'), { recursive: true });
+    await writeSourceManual(path.join(project, 'src', 'app.js'), 'export const app = true;');
+    await writeFolderManual(path.join(project, 'src'), project, 'src');
     await fs.mkdir(path.join(project, '.openprd', 'harness', 'test-reports'), { recursive: true });
     await fs.writeFile(path.join(project, '.openprd', 'harness', 'test-reports', 'setup-smoke.md'), [
       '# EVO setup report',
@@ -449,6 +459,49 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     } else {
       process.env.OPENPRD_CODEX_HOME = previousCodexHome;
     }
+    if (previousOpenPrdHome === undefined) {
+      delete process.env.OPENPRD_HOME;
+    } else {
+      process.env.OPENPRD_HOME = previousOpenPrdHome;
+    }
+  }
+});
+
+test('setup emits Windows-safe Codex hook commands with double-quoted paths', async () => {
+  const originalProject = await makeTempProject();
+  const project = path.join(path.dirname(originalProject), 'project with spaces');
+  const codexHome = path.join(project, 'codex-home');
+  const previousCodexHome = process.env.OPENPRD_CODEX_HOME;
+  process.env.OPENPRD_CODEX_HOME = codexHome;
+  await fs.rename(originalProject, project);
+
+  try {
+    const result = await setupAgentIntegrationWorkspace(project, {
+      tools: 'codex',
+      templatePack: 'agent',
+      enableUserCodexConfig: true,
+      codexHome,
+      platform: 'win32',
+    });
+    assert.equal(result.ok, true);
+
+    const hooks = JSON.parse(await fs.readFile(path.join(project, '.codex', 'hooks.json'), 'utf8'));
+    const promptGroup = findOpenPrdHookGroup(hooks.UserPromptSubmit);
+    assert.ok(promptGroup);
+    assert.equal(promptGroup.hooks[0].command.startsWith('node "'), true);
+    assert.ok(promptGroup.hooks[0].command.includes('/project with spaces/.codex/hooks/openprd-hook.mjs" UserPromptSubmit'));
+    assert.equal(/node '.*openprd-hook\.mjs'/.test(promptGroup.hooks[0].command), false);
+
+    const config = await fs.readFile(path.join(project, '.codex', 'config.toml'), 'utf8');
+    assert.ok(config.includes('command = "node \\"'));
+    assert.ok(config.includes('project with spaces'));
+    assert.equal(/node '.*openprd-hook\.mjs'/.test(config), false);
+  } finally {
+    if (previousCodexHome === undefined) {
+      delete process.env.OPENPRD_CODEX_HOME;
+    } else {
+      process.env.OPENPRD_CODEX_HOME = previousCodexHome;
+    }
   }
 });
 
@@ -496,44 +549,6 @@ test('doctor reports optional capabilities without making them blocking and dete
   assert.ok(deepwiki?.configuredLocations.some((location) => location.path === '.mcp.json'));
 });
 
-
-test('setup emits Windows-safe Codex hook commands with double-quoted paths', async () => {
-  const originalProject = await makeTempProject();
-  const project = path.join(path.dirname(originalProject), 'project with spaces');
-  const codexHome = path.join(project, 'codex-home');
-  const previousCodexHome = process.env.OPENPRD_CODEX_HOME;
-  process.env.OPENPRD_CODEX_HOME = codexHome;
-  await fs.rename(originalProject, project);
-
-  try {
-    const result = await setupAgentIntegrationWorkspace(project, {
-      tools: 'codex',
-      templatePack: 'agent',
-      enableUserCodexConfig: true,
-      codexHome,
-      platform: 'win32',
-    });
-    assert.equal(result.ok, true);
-
-    const hooks = JSON.parse(await fs.readFile(path.join(project, '.codex', 'hooks.json'), 'utf8'));
-    const promptGroup = findOpenPrdHookGroup(hooks.UserPromptSubmit);
-    assert.ok(promptGroup);
-    assert.equal(promptGroup.hooks[0].command.startsWith('node "'), true);
-    assert.ok(promptGroup.hooks[0].command.includes('/project with spaces/.codex/hooks/openprd-hook.mjs" UserPromptSubmit'));
-    assert.equal(/node '.*openprd-hook\.mjs'/.test(promptGroup.hooks[0].command), false);
-
-    const config = await fs.readFile(path.join(project, '.codex', 'config.toml'), 'utf8');
-    assert.ok(config.includes('openprd-hook.mjs\\" UserPromptSubmit'));
-    assert.ok(config.includes('project with spaces'));
-    assert.equal(/node '.*openprd-hook\.mjs'/.test(config), false);
-  } finally {
-    if (previousCodexHome === undefined) {
-      delete process.env.OPENPRD_CODEX_HOME;
-    } else {
-      process.env.OPENPRD_CODEX_HOME = previousCodexHome;
-    }
-  }
-});
 
 test('clarify treats legacy artifact mode as an inline checklist', async () => {
   const project = await makeTempProject();
