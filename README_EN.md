@@ -2,13 +2,18 @@
 
 [简体中文](./README.md) | English
 
-> AI-native PRD workspace and lifecycle CLI for requirement clarification, HTML-first review surfaces, diagram confirmation, and handoff.
+> An AI-native PRD workspace and CLI that helps teams clarify requests, confirm direction, and ship with evidence.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.19.0-339933.svg)](https://nodejs.org/)
 [![GitHub stars](https://img.shields.io/github/stars/mileson/openprd?style=social)](https://github.com/mileson/openprd)
 
-OpenPrd is a lightweight **PRD harness** for teams and agents that need more than “write a document”. It gives you a local workspace, a clarification-first workflow, policy-based review gates, diagram artifacts, and a structured change/spec/task workflow.
+OpenPrd is a lightweight **PRD harness**. Start by describing the problem in plain language, and it helps teams and agents turn that request into:
+
+- requirement clarification
+- shared confirmation
+- visual review
+- structured handoff into execution
 
 Instead of hiding key decisions in prompts or terminal logs, OpenPrd keeps people and agents aligned around stable HTML artifacts such as `review.html`, learning readers, and quality reports.
 
@@ -29,6 +34,20 @@ It is especially useful when you want:
 - **source-aware capture** so user-confirmed facts stay separate from repo-derived, agent-inferred, or agent-normalized context
 - **policy-based review gates** that keep stable artifacts without forcing the same stop every time
 - **agent-facing skills** shipped with the tool, not hidden in a local environment
+
+If your teammates often say “we kind of know what we want, but it is not fully shaped yet”, that is usually the moment when OpenPrd is most useful.
+
+## How OpenPrd routes a request
+
+You do not need to decide whether your request is `L0 / L1 / L2`, and you do not need a technical design up front. Start with business language: who is stuck, in what situation, and what you want fixed first. OpenPrd helps turn that into the right working rhythm.
+
+![OpenPrd requirement routing](https://raw.githubusercontent.com/mileson/openprd/main/docs/assets/openprd-requirement-routing-en.svg)
+
+- **Quick fix**: the problem is already clear, the blast radius is small, and success is easy to verify. OpenPrd usually handles it directly and then reports back what changed and how it was checked.
+- **Existing-flow improvement**: the goal is clear, but it affects several screens, states, or user actions. OpenPrd first gives a plain-language mini-plan, then continues once the direction is aligned.
+- **New feature / new workflow**: the surface area is bigger, more roles are involved, or the business risk is still unclear. OpenPrd first clarifies the user scenario, first version, what stays out of scope, and the main risks before moving into the full review/spec/task path.
+
+If the request is more consumer-oriented, OpenPrd pays extra attention to the user moment, the first felt value, and whether people will want to come back. If it is more B2B, it cares more about who approves, who uses, and who must drive rollout. If it is more agent-oriented, it focuses on what can be automated, where human backup is required, and what happens when the flow fails. The default conversation is about outcomes, situations, and risks, not internal tooling words.
 
 ## Where OpenPrd Is Different
 
@@ -266,6 +285,12 @@ openprd clarify /path/to/project
 ```
 
 Clarification stays in the conversation as an inline outline or short checklist. The formal HTML review surface is `review.html` after synthesis.
+
+OpenPrd first routes the request by user-visible need type instead of forcing a long intake form:
+
+- **Quick fix**: usually handle it directly, then report what changed and how it was verified.
+- **Existing-flow improvement**: first share a mini-plan in plain language, then continue after direction is confirmed.
+- **New feature / new workflow**: first clarify the scenario, scope, first version, and risks, then move into `review`, `change`, and `tasks`.
 
 ### 4. Capture answers back into the workspace
 

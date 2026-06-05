@@ -473,17 +473,17 @@ function summarizeArchitectureSignals(gate, snapshot) {
   })}`;
   const hits = [];
   if (/前端|页面|客户端|web|h5|移动端|ios|android|桌面|ui|交互/i.test(text)) {
-    hits.push('前端或客户端体验');
+    hits.push('用户入口与页面体验');
   }
   if (/后端|服务端|server|api|数据库|存储|队列|定时任务|cron|webhook/i.test(text)) {
-    hits.push('后端或数据服务');
+    hits.push('服务流程与数据处理');
   }
   if (/agent|workflow|tool|skill|MCP|自动化|编排/i.test(text)) {
-    hits.push('Agent 或工具链协作');
+    hits.push('Agent 协作与自动执行');
   }
   return hits.length > 0
     ? hits.join('；')
-    : '技术落点仍待确认，可先按前端 / 后端 / Agent 协作边界补齐。';
+    : '影响环节仍待确认，可先按用户入口、服务流程或 Agent 协作补齐。';
 }
 
 function collectProjectRiskProbes(gate, snapshot) {
@@ -495,12 +495,12 @@ function collectProjectRiskProbes(gate, snapshot) {
   })}`;
   const probes = [];
   const probeMap = [
-    { label: '登录 / 账号 / 权限', pattern: /登录|账号|auth|oauth|权限|角色|rbac/i },
-    { label: '用户数据 / 存储 / 隐私', pattern: /数据|数据库|存储|隐私|文件|上传|下载|同步/i },
-    { label: '多人协作 / 审批 / 组织', pattern: /团队|协作|审批|组织|成员|管理员|buyer|admin/i },
-    { label: '外部服务 / API / 集成', pattern: /第三方|外部|api|sdk|集成|webhook|支付|短信/i },
-    { label: 'AI / Agent / 模型调用', pattern: /ai|agent|模型|llm|生成|推理|prompt/i },
-    { label: '收费 / 额度 / 成本', pattern: /收费|订阅|付费|价格|额度|点数|积分|成本|quota|billing/i },
+    { label: '账号身份与可见范围', pattern: /登录|账号|auth|oauth|权限|角色|rbac/i },
+    { label: '用户数据与信息处理', pattern: /数据|数据库|存储|隐私|文件|上传|下载|同步/i },
+    { label: '团队协作与审批流转', pattern: /团队|协作|审批|组织|成员|管理员|buyer|admin/i },
+    { label: '外部系统与合作方对接', pattern: /第三方|外部|api|sdk|集成|webhook|支付|短信/i },
+    { label: 'AI 结果可靠性与人工兜底', pattern: /ai|agent|模型|llm|生成|推理|prompt/i },
+    { label: '收费模式、额度与成本', pattern: /收费|订阅|付费|价格|额度|点数|积分|成本|quota|billing/i },
   ];
   for (const probe of probeMap) {
     if (probe.pattern.test(text)) {
@@ -536,6 +536,52 @@ function buildProjectFraming({ gate, snapshot, scenario, productType }) {
 
 function escapeMarkdownTableCell(value) {
   return String(value ?? '').replace(/\|/g, '/');
+}
+
+function containsPendingClarifyMarker(value) {
+  return /(待确认|需要先确认|仍待确认|未分类)/.test(String(value ?? ''));
+}
+
+function describeProductLensFocus(productType) {
+  if (productType === 'consumer') {
+    return '这轮我会重点看首次使用场景、关键感受，以及用户愿不愿意继续回来。';
+  }
+  if (productType === 'b2b') {
+    return '这轮我会重点看谁拍板、谁使用、谁运营，以及上线协作会卡在哪里。';
+  }
+  if (productType === 'agent') {
+    return '这轮我会重点看哪些步骤让 Agent 自主完成、哪些节点必须人工拍板，以及失败时谁兜底。';
+  }
+  return '这轮我会优先把用户、场景、第一版切片、边界和风险讲清楚。';
+}
+
+function buildClarifyDirectionChoices(productType) {
+  if (productType === 'consumer') {
+    return [
+      '先把第一次上手跑通：更快定第一版，但后续可能还要补留存动作。',
+      '先把关键转化做好：更贴近商业结果，但对场景边界要求更高。',
+      '先把愿意回来这件事做顺：更利于长期价值，但首版会慢一点。',
+    ];
+  }
+  if (productType === 'b2b') {
+    return [
+      '先解决单角色提效：更容易落地，但跨团队价值暂时有限。',
+      '先打通跨角色流转：业务收益更明显，但协调成本更高。',
+      '先补管理与配置能力：便于后续扩张，但首版体感未必最强。',
+    ];
+  }
+  if (productType === 'agent') {
+    return [
+      '先跑通单步自动化：最快看到结果，但协作链路还比较浅。',
+      '先做多步编排：更像完整方案，但边界和失败恢复要更早想清楚。',
+      '先把人工兜底做稳：风险更低，但自动化收益会慢一点体现。',
+    ];
+  }
+  return [
+    '先把用户最痛的一步打通：更容易收敛首版，但覆盖面会窄一些。',
+    '先把主流程串起来：更完整，但第一版实现成本更高。',
+    '先把边界和风险控住：更稳，但用户感知收益会慢一点出现。',
+  ];
 }
 
 function normalizeClarifyMode(mode) {
@@ -594,32 +640,53 @@ function buildInlineClarification({ clarification, reflection, presentation }) {
   const prompt = reflection?.promptPreview || '本轮需求';
   const projectContext = reflection?.projectContext ?? {};
   const projectFraming = projectContext.projectFraming ?? {};
+  const productType = projectContext.productType;
+  const primaryQuestion = clarification.mustAskUser[0] ?? null;
+  const followUpQuestions = clarification.mustAskUser.slice(1, presentation.mode === 'inline' ? 2 : 3);
+  const directionChoices = (
+    containsPendingClarifyMarker(projectFraming.firstSlice)
+    || containsPendingClarifyMarker(projectFraming.audience)
+  )
+    ? buildClarifyDirectionChoices(productType)
+    : [];
   const lines = [
-    `我理解的目标：${prompt}`,
-    `落点：${projectContext.productName ?? '当前项目'}；按${projectContext.scenario ?? '当前工作区'}处理。`,
-    `适用对象：${projectFraming.audience ?? '待确认'}；产品形态：${projectFraming.productShape ?? '待确认'}`,
-    `第一版先做：${projectFraming.firstSlice ?? '待确认'}`,
-    `先不做：${projectFraming.nonGoals ?? '待确认'}`,
-    `不能破坏：${projectFraming.guardrails ?? '待确认'}`,
+    `我先用产品和业务语言复述一下：${prompt}`,
+    `主要服务对象：${projectFraming.audience ?? '待确认'}。`,
+    `使用场景更像：${projectFraming.productShape ?? '待确认'}。`,
+    `第一版先让用户做到：${projectFraming.firstSlice ?? '待确认'}。`,
+    `这轮先不碰：${projectFraming.nonGoals ?? '待确认'}。`,
+    `必须守住：${projectFraming.guardrails ?? '待确认'}。`,
+    describeProductLensFocus(productType),
   ];
   if (projectFraming.architectureSignals) {
-    lines.push(`技术落点：${projectFraming.architectureSignals}`);
+    lines.push(`这次会影响的环节：${projectFraming.architectureSignals}。`);
   }
   if (projectFraming.riskProbes?.length > 0) {
-    lines.push(`额外关注：${projectFraming.riskProbeSummary}`);
+    lines.push(`我先提醒的业务风险：${projectFraming.riskProbeSummary}。`);
   }
-  lines.push('验收方式：确认用户能看到或完成的结果，以及哪些既有行为不能被改变。');
+  lines.push('判断这轮是否值得做成：看用户是否真的更顺、更快、更稳地完成关键动作。');
   if (projectContext.activeChange) {
     lines.push(`历史提醒：当前还有 ${projectContext.activeChange.activeChange}，本轮先分开处理。`);
   }
-  const questions = clarification.mustAskUser.slice(0, presentation.mode === 'inline' ? 3 : 5);
-  if (questions.length > 0) {
-    lines.push('建议确认：');
-    for (const item of questions) {
-      lines.push(`- ${item.prompt}`);
+  if (primaryQuestion) {
+    lines.push('我建议这轮先确认这一点：');
+    lines.push(`- ${primaryQuestion.prompt}`);
+    if (followUpQuestions.length > 0) {
+      lines.push('这点定下来后，我再继续补下面这些：');
+      for (const item of followUpQuestions) {
+        lines.push(`- ${item.prompt}`);
+      }
     }
   } else {
-    lines.push('建议确认：如果以上理解正确，用户回复“可以”或“确认执行”后再继续。');
+    lines.push('我这边暂时没有新的关键追问了。');
+  }
+  if (directionChoices.length > 0) {
+    lines.push('如果你现在还不想展开细节，也可以先在这 3 个方向里选一个：');
+    for (const choice of directionChoices) {
+      lines.push(`- ${choice}`);
+    }
+  } else {
+    lines.push('如果以上理解正确，用户回复“可以”或“确认执行”后再继续。');
   }
   return {
     mode: presentation.mode,
@@ -650,6 +717,19 @@ function reflectionQuestion(id, label, prompt) {
     prompt,
     reason: 'requirement-intake-reflection',
   };
+}
+
+function buildLensReflectionQuestion(productType) {
+  if (productType === 'consumer') {
+    return reflectionQuestion('product-lens', '用户场景与回访价值', '请确认这次主要服务哪类个人用户、他们第一次会在什么场景下想用它，以及什么结果会让他们愿意继续回来。');
+  }
+  if (productType === 'b2b') {
+    return reflectionQuestion('product-lens', '角色关系与上线阻力', '请确认谁拍板、谁使用、谁负责推进或运营，以及最可能拖慢上线的是哪段协作、审批或对接。');
+  }
+  if (productType === 'agent') {
+    return reflectionQuestion('product-lens', '自主边界与人工兜底', '请确认哪些步骤希望 Agent 自主完成、哪些节点必须人工拍板，以及失败时由谁接住。');
+  }
+  return reflectionQuestion('product-lens', '用户价值与取舍', '请确认这次最重要的用户价值是什么；如果只能先保一个方向，你更想先保效率、体验，还是风险可控。');
 }
 
 function shouldBuildRequirementIntakeReflection({ gate, scenario, analysis }) {
@@ -684,25 +764,27 @@ async function buildRequirementIntakeReflection({ projectRoot, ws, snapshot, ana
     scenario,
     productType: snapshot.productType ?? resolveCurrentProductType(ws),
   });
+  const lensQuestion = buildLensReflectionQuestion(snapshot.productType ?? resolveCurrentProductType(ws));
   const needsDeliveryShapeQuestion = !needsInterfaceSketch
     && (
       projectFraming.riskProbes.length > 0
-      || !projectFraming.architectureSignals.includes('仍待确认')
+      || !containsPendingClarifyMarker(projectFraming.architectureSignals)
     );
   const mustConfirm = complexity.mode === 'deep'
     ? [
-        reflectionQuestion('intent', '意图与目标', '请确认我对需求目标的理解：它是给谁用的、属于哪类产品（个人 / 团队 / Agent 协作）、在哪个场景下需要完成什么结果？'),
+        reflectionQuestion('intent', '意图与目标', '请确认我理解得对不对：这次主要是谁在什么场景下遇到什么问题，第一版最想先改善什么结果？'),
+        lensQuestion,
         reflectionQuestion('project-context', '项目影响范围', '结合当前项目，请确认第一版最小可用切片是什么；哪些已有模块、入口、流程或历史需求必须复用，哪些可以调整？'),
-        reflectionQuestion('scope-quality', '范围与验收', '请确认这次先做什么、不做什么、哪些既有能力不能被破坏，以及成功标准和失败路径分别是什么。'),
+        reflectionQuestion('scope-quality', '范围与验收', '请确认这次先做到哪一步就算有价值；哪些这轮先不动；哪些老用户习惯、现有业务结果或交付节奏不能被影响？'),
         needsInterfaceSketch
           ? reflectionQuestion('interface-sketch', '界面或流程草图', '需求涉及界面或流程，请先确认主要区域、操作入口、预览/确认点和风险提示。')
           : needsDeliveryShapeQuestion
-            ? reflectionQuestion('delivery-shape', '交付形态与技术边界', '请确认这次需要前端、后端、数据/账号、外部服务、AI/Agent 或多人协作中的哪些部分，各自边界和最关键风险是什么。')
-            : reflectionQuestion('details-boundary', '细节与边界', '请确认关键字段、状态变化、数据来源、权限边界和可验收细节。'),
+            ? reflectionQuestion('delivery-shape', '影响环节与业务风险', '请确认这次大概会牵动哪些环节，例如用户入口、内部流程、账号与权限、外部对接、AI 自动化或成本控制；其中最大的业务风险是什么。')
+            : reflectionQuestion('details-boundary', '关键状态与验收细节', '请确认用户会看到的关键状态、重要字段、例外场景和最小验收标准。'),
       ]
     : [
-        reflectionQuestion('project-context', '项目映射', '请确认这个调整具体落在哪个页面、模块、入口或流程，以及第一版先做哪一小块。'),
-        reflectionQuestion('acceptance', '验收方式', '请确认完成后用户能看到或做到什么、哪些既有行为不能改变，以及最小验收标准是什么。'),
+        reflectionQuestion('project-context', '项目映射', '请确认这个调整具体落在哪个页面、模块、入口或流程，以及第一版先做哪一小块最有价值。'),
+        reflectionQuestion('acceptance', '验收方式', '请确认完成后用户能明显感受到什么变化、哪些既有行为不能改变，以及最小验收标准是什么。'),
       ];
 
   return {
@@ -753,8 +835,8 @@ async function buildRequirementIntakeReflection({ projectRoot, ws, snapshot, ana
         findings: [
           `仍需确认的信息：${shortList(missing, '暂无明显缺口')}`,
           `边界与约束：先不做=${projectFraming.nonGoals}；不能破坏=${projectFraming.guardrails}`,
-          needsInterfaceSketch ? '需求看起来涉及界面或流程，需要先给用户确认草图或关键操作路径。' : `技术落点：${projectFraming.architectureSignals}`,
-          `风险探针：${projectFraming.riskProbeSummary}`,
+          needsInterfaceSketch ? '需求看起来涉及界面或流程，需要先给用户确认草图或关键操作路径。' : `影响环节：${projectFraming.architectureSignals}`,
+          `业务提醒：${projectFraming.riskProbeSummary}`,
           '进入实现前必须保留范围、非目标、异常路径和验收证据。',
         ],
       },
@@ -791,8 +873,8 @@ function renderRequirementIntakeReflection(reflection) {
     `| 第一版先做 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.firstSlice ?? '待补充')} |`,
     `| 暂不处理 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.nonGoals ?? '待补充')} |`,
     `| 不能破坏 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.guardrails ?? '待补充')} |`,
-    `| 技术落点 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.architectureSignals ?? '待补充')} |`,
-    `| 风险探针 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.riskProbeSummary ?? '待补充')} |`,
+    `| 影响环节 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.architectureSignals ?? '待补充')} |`,
+    `| 业务提醒 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.riskProbeSummary ?? '待补充')} |`,
     '',
   ];
   for (const round of reflection.rounds) {
@@ -823,14 +905,14 @@ function buildRequirementIntakeDepth(gate, reflection = null) {
   const needsInterfaceSketch = requirementLooksLikeInterfaceWork(gate);
   const fallbackLayers = [
     reflectionQuestion('product-context', '用户 / 产品形态 / 问题', '先确认：这是给谁用的、它更像个人产品 / 团队流程 / Agent 协作中的哪一种、为什么现在值得解决？'),
-    reflectionQuestion('product-outcome', '第一版切片 / 目标 / 成功标准', '请确认第一版最小可用切片是什么；解决后用户先能完成什么，用什么成功指标或验收标准判断有效？'),
+    reflectionQuestion('product-outcome', '第一版切片 / 目标 / 成功标准', '请确认第一版最小可用切片是什么；解决后用户先能完成什么，用什么业务结果或验收标准判断有效？'),
     reflectionQuestion('product-flow', '范围 / 非目标 / 异常路径', '请拆出本轮先做什么、不做什么、哪些既有行为不能被破坏，以及关键失败路径和恢复方式。'),
     reflectionQuestion(
       'product-detail',
       needsInterfaceSketch ? '界面草图 / 字段 / 状态' : '细节 / 状态 / 边界',
       needsInterfaceSketch
         ? '这个需求涉及界面，请先给用户一版 ASCII 线框草图，标出主要区域、操作入口、预览/确认点和风险提示，让用户确认后再 synthesize。'
-        : '请补齐关键字段、状态变化、数据来源、权限边界和可验收细节；如果后续发现涉及界面，也要先补 ASCII 线框草图。'
+        : '请补齐用户会看到的关键状态、重要字段、业务边界和可验收细节；如果后续发现涉及界面，也要先补 ASCII 线框草图。'
     ),
   ];
   const layers = reflection?.mustConfirm?.length > 0 ? reflection.mustConfirm : fallbackLayers;
@@ -1889,13 +1971,22 @@ ${content}`);
     `已加载 ${productType ?? '未分类'} 的访谈问题。`,
     `来源文件: ${sourceFiles.map((filePath) => path.relative(ws.workspaceRoot, filePath)).join(', ')}`,
   ]);
-  await appendOpenQuestions(ws, [
-    '我们要解决什么问题？',
-    '主要用户是谁？它更像 consumer、b2b 还是 agent？',
-    '第一版最小可用切片是什么？',
-    '哪些内容暂时不做，哪些既有能力不能被破坏？',
-    '如果涉及登录、数据、AI、外部服务或收费，最关键的风险是什么？',
-  ]);
+  const openQuestions = [
+    '这次主要是给谁用的，他们在什么场景下最卡？',
+    '第一版最值得先让用户完成什么关键动作？',
+    '这轮先不做什么，哪些既有体验、流程或业务结果不能被影响？',
+  ];
+  if (productType === 'consumer') {
+    openQuestions.push('什么结果会让用户愿意继续回来，甚至愿意推荐或付费？');
+  } else if (productType === 'b2b') {
+    openQuestions.push('谁拍板、谁使用、谁推进或运营，这几方最容易卡在哪里？');
+  } else if (productType === 'agent') {
+    openQuestions.push('哪些步骤让 Agent 自主做，哪些节点必须保留人工确认或兜底？');
+  } else {
+    openQuestions.push('如果现在还不想讲太细，先确认最重要的用户价值、边界和风险也可以。');
+  }
+  openQuestions.push('如果涉及账号、数据、外部对接、AI 或成本，最大的业务风险是什么？');
+  await appendOpenQuestions(ws, openQuestions);
   await writeJson(ws.paths.taskGraph, buildWorkflowTaskGraph(storedCurrentState));
 
   return {

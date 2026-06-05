@@ -259,9 +259,9 @@ test('clarify stays inline and synthesize writes a review artifact', async () =>
   assert.equal(await pathExists(path.join(project, '.openprd', 'engagements', 'active', 'clarify.html')), false);
   assert.ok(clarify.intakeReflection);
   assert.ok(clarify.intakeReflectionPath);
-  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我理解的目标')));
-  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('适用对象')));
-  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('第一版先做')));
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我先用产品和业务语言复述一下')));
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('主要服务对象')));
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('第一版先让用户做到')));
   assert.ok((await fs.readFile(path.join(project, '.openprd', 'engagements', 'active', 'intake-reflection.md'), 'utf8')).includes('首轮项目画像'));
 
   await classifyWorkspace(project, 'agent');

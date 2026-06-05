@@ -864,8 +864,8 @@ function analyzePromptIntent(prompt) {
     || /模式:\s*loop-run\b/i.test(text)
     || /模式:\s*loop-finish\b/i.test(text);
   // These signals only decide when to inject/open the requirement-intake lane.
-  // The L0/L1/L2 decision itself belongs to openprd-requirement-intake, not to
-  // this matcher.
+  // The matcher should stay conservative: only likely L2 requests open the
+  // heavy gate; L0/L1 stay lightweight unless the user expands the scope.
   const requirementRoutingSignalsStrong = [
     /新增/,
     /增加/,
@@ -906,6 +906,9 @@ function analyzePromptIntent(prompt) {
     /放到/,
     /移到/,
     /移动到/,
+    /切到/,
+    /切换到/,
+    /替换(成|为)?/,
     /串联/,
     /接入/,
     /实现/,
@@ -927,8 +930,36 @@ function analyzePromptIntent(prompt) {
     /按钮|文案|颜色|圆角|位置|间距|字号|图标|标题|空格|标点|label|copy/i,
     /从.+(改到|移到|移动到|换到|变成|改成|改为).+/,
   ];
-  const complexScopePatterns = [
-    /新增|新建|模块|流程|编排|一站式|权限|审批|团队|agent\s*市场|AI/i,
+  const l2ScopePatterns = [
+    /模块/,
+    /入口/,
+    /流程/,
+    /编排/,
+    /一站式/,
+    /团队搭建/,
+    /agent\s*市场/i,
+    /skill\s*library/i,
+    /cli\s*库/i,
+    /workflow/i,
+    /wizard/i,
+    /权限/,
+    /审批/,
+    /计费/,
+    /账号/,
+    /第三方/,
+    /云服务/,
+    /迁移/,
+    /跨系统/,
+    /(AI|模型).{0,8}(接入|集成|编排)/i,
+  ];
+  const crossSystemRiskPatterns = [
+    /支付|登录|注册|账号|权限|订单|回调|风控|退款|计费|同步|迁移|数据库|schema|协议|网关|跨系统|第三方|云服务|OSS|CDN|MCP|SDK|CLI/i,
+  ];
+  const l1OptimizationPatterns = [
+    /(优化|调整|改版|重做|重构|增强|补齐|梳理|统一|整理)/,
+  ];
+  const l0AdjustmentPatterns = [
+    /(修复|修一下|改一下|调一下|换成|改成|去掉|补一个|补一下)/,
   ];
   const explicitExecutionPatterns = [
     /直接(帮我|给我)?(改|做|实现|落地|修|修复|处理|解决)/,
@@ -998,9 +1029,12 @@ function analyzePromptIntent(prompt) {
   ];
   const bugfixOrDiagnostic = /诊断包|报错|错误|异常|崩溃|bug|问题|排查|定位|根因|复现|日志|故障/i.test(text)
     || /失败.{0,20}(原因|根因|排查|定位|修|修复|处理|解决)|(?:原因|根因|排查|定位).{0,20}失败/.test(text);
+  const tinyEdit = tinyEditPatterns.some((pattern) => pattern.test(text));
+  const l2ScopeMatched = l2ScopePatterns.some((pattern) => pattern.test(text));
+  const crossSystemRiskMatched = crossSystemRiskPatterns.some((pattern) => pattern.test(text));
   const simpleConcrete = text.length <= 80
     && simpleConcretePatterns.some((pattern) => pattern.test(text))
-    && !complexScopePatterns.some((pattern) => pattern.test(text));
+    && !l2ScopeMatched;
   const reviewContinuationRequested = reviewContinuationPatterns.some((pattern) => pattern.test(text));
   const explicitExecution = internalOpenPrdExecution
     || continuationRequest
@@ -1025,9 +1059,15 @@ function analyzePromptIntent(prompt) {
     && /(大|较大|比较大|明显|重做|重构|改版|优化|重新设计|设计方向|三种|3种|方案|效果图|先看样子|确认方向|体验优化|产品内)/i.test(text);
   const visualReview = /效果图|实现截图|视觉对比|视觉评审|对标效果图|复刻/i.test(text);
   const directBugfixExecution = explicitExecution && bugfixOrDiagnostic;
+  const newFeatureVerbMatched = /(新增|增加|新建)/.test(text);
+  const localUiScopeMatched = /(按钮|文案|颜色|圆角|位置|间距|字号|图标|标题|空格|标点|label|copy|toast|placeholder|样式|页面|界面|布局|信息架构|导航|列表|详情页|设置页)/i.test(text);
   const requirementSignalMatched = requirementRoutingSignalsStrong.some((pattern) => pattern.test(text))
     || (requirementRoutingSignalsWeak.some((pattern) => pattern.test(text))
       && requirementChangeIntentSignals.some((pattern) => pattern.test(text)));
+  const l1OptimizationMatched = l1OptimizationPatterns.some((pattern) => pattern.test(text))
+    && /(页面|界面|视觉|样式|布局|信息架构|交互|体验|流程|入口|导航|表单|设置页|列表|详情页)/i.test(text);
+  const l0AdjustmentMatched = l0AdjustmentPatterns.some((pattern) => pattern.test(text))
+    && /(按钮|文案|颜色|圆角|位置|间距|字号|图标|标题|空格|标点|label|copy|toast|placeholder|样式|一处)/i.test(text);
   const publicRepoResearchRequest = githubRepoPattern.test(text)
     && /(github|仓库|repo|项目|参考|对标|复刻|review|学习|架构|模块|流程|构建|测试|扩展点)/i.test(text);
   const externalTechResearchRequest = /(第三方|library|framework|sdk|api|mcp|cli|依赖|包|版本|迁移|弃用|官方文档|参数|返回值|生命周期)/i.test(text)
@@ -1043,15 +1083,36 @@ function analyzePromptIntent(prompt) {
   const browserSafetyRequest = /(computer use|browser use|浏览器|browser|网页|页面|窗口|标签页|tab|profile)/i.test(text)
     && /(点击|输入|提交|登录|注销|退出|支付|关闭|send|submit|type|click|switch account|切换账号)/i.test(text);
   const productCopyRequest = /(文案|copy|错误文案|空状态|成功提示|按钮文案|提示语|toast|placeholder|设置项文案|国际化|i18n|locales|translations|localizable)/i.test(text);
-  const requiresIntake = !internalOpenPrdExecution
-    && requirementSignalMatched
-    && !tinyEditPatterns.some((pattern) => pattern.test(text))
-    && !simpleConcrete
-    && !visualMockupRequest
-    && !directBugfixExecution
-    && !(readOnly && !explicitExecution);
+  const requirementTier = !internalOpenPrdExecution
+    ? ((requirementSignalMatched || (bugfixOrDiagnostic && explicitExecution))
+        && !tinyEdit
+        && !simpleConcrete
+        && !visualMockupRequest
+        && !(readOnly && !explicitExecution)
+        && (
+          (requirementSignalMatched && l2ScopeMatched)
+          || (bugfixOrDiagnostic && crossSystemRiskMatched)
+          || (newFeatureVerbMatched && !localUiScopeMatched)
+        )
+      ? 'l2'
+      : (!visualMockupRequest
+          && (!readOnly || explicitExecution)
+          && (tinyEdit
+            || simpleConcrete
+            || l0AdjustmentMatched
+            || (directBugfixExecution && !crossSystemRiskMatched)
+            || (bugfixOrDiagnostic && !crossSystemRiskMatched))
+        ? 'l0'
+        : (!visualMockupRequest
+            && !readOnly
+            && (largeUiChangeRequest || l1OptimizationMatched || requirementSignalMatched)
+          ? 'l1'
+          : null)))
+    : null;
+  const requiresIntake = requirementTier === 'l2';
   return {
     promptText: text,
+    requirementTier,
     requiresIntake,
     explicitExecution,
     confirmation,
@@ -1077,6 +1138,7 @@ function analyzePromptIntent(prompt) {
     browserSafetyRequest,
     productCopyRequest,
     shouldInject: requiresIntake
+      || requirementTier === 'l1'
       || explicitExecution
       || confirmation
       || readOnly
@@ -1147,7 +1209,7 @@ function openRequirementGate(root, prompt, intent, sessionId = null) {
     openedAt: current?.openedAt || now(),
     updatedAt: now(),
     promptPreview: preview(prompt, 500),
-    reason: 'requirement-intake routing candidate',
+    reason: 'likely-l2 requirement flow',
     requiredFlow: ['requirement-intake', 'clarify', 'capture', 'synthesize', 'review', 'change-generate', 'tasks', 'implementation'],
     intakeMode: detectRequirementIntakeMode(prompt),
     intent,
@@ -1938,8 +2000,9 @@ function requirementGateMessage(intent, gate) {
   const status = gateBlocksImplementation ? 'active' : 'opened';
   return [
     'OpenPrd requirement intake gate: ' + status + '.',
-    'This prompt matched the requirement-intake safety lane. Do not decide from fixed keywords; first use $openprd-requirement-intake to classify the user-visible requirement type by impact, unknowns, decision cost, and validation cost.',
+    'This prompt looks like a likely 新功能/新流程方案 (L2), so the heavy requirement-intake lane is active. Do not decide from fixed keywords; first use $openprd-requirement-intake to classify the user-visible requirement type by impact, unknowns, decision cost, and validation cost.',
     'Keep this mapping visible for internal review: 快速修正=L0, 现有功能优化=L1, 新功能/新流程方案=L2.',
+    'L0 and L1 stay on lightweight paths and should not be forced through formal PRD/review/change/tasks unless the scope expands.',
     'If the requirement type is 新功能/新流程方案 (L2), do not edit implementation files yet and proceed through PRD/review/change/tasks with the appropriate base/consumer/b2b/agent PRD lens.',
     reviewPolicyAllowsSilentRecord(approvalPolicy)
       ? 'Decision-point policy: clarify the requirement, capture user answers, synthesize the PRD, record the exact current stable review artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.'
@@ -1950,6 +2013,29 @@ function requirementGateMessage(intent, gate) {
     'If the original request already asked to implement, execution can continue once the active approval policy and tasks are ready; otherwise wait for a clear execution request.',
     'Recommended next action: write a short 需求类型判断 in chat with both 需求类型 and 内部路由码, then for 新功能/新流程方案 (L2) run openprd clarify ., summarize target, scope, out-of-scope, and acceptance in chat, then ask for confirmation. Do not open a clarification HTML page; the formal HTML review happens after synthesize/review.',
   ].join('\n');
+}
+
+function lightweightRequirementMessage(intent) {
+  if (intent?.requirementTier === 'l0') {
+    return [
+      'OpenPrd 轻量需求路径: 当前更接近快速修正 (L0)。',
+      '直接处理并事后说明即可，不打开正式 PRD/review/change/tasks。',
+      '优先做最小足够验证，并用 1-2 句说明本轮特别需要强化的测试点；默认不要求正式测试报告。',
+      '如果过程中暴露出跨系统依赖、支付/账号/权限/回调等高风险因素，再升级到 L2 重流程。',
+    ].join('\n');
+  }
+  if (intent?.requirementTier === 'l1') {
+    return [
+      'OpenPrd 轻量需求路径: 当前更接近现有功能优化 (L1)。',
+      '先在对话里给 3-5 行 mini-plan，至少写清目标、范围内、范围外和验证方式。',
+      '默认不要打开正式 PRD/review/change/tasks；只有在 mini-plan 暴露新决策缺口、跨系统风险或范围升级时，才提升到 L2 重流程。',
+      '验证采用最小足够组合即可，重点说明需要强化测试的地方；默认不要求正式测试报告。',
+      intent?.largeUiChangeRequest
+        ? '如果这是大界面改动，mini-plan 之后先做 3 方向视觉方案评审，再进入实现。'
+        : '',
+    ].filter(Boolean).join('\n');
+  }
+  return null;
 }
 
 function visualMockupMessage(intent) {
@@ -2032,7 +2118,7 @@ function currentRequirementMessage(intent, gate, progress) {
   const lines = [
     'OpenPrd 当前需求入口',
     gateStatus,
-    '当前输入命中了需求入口安全通道。不要按固定关键词判断；先用 $openprd-requirement-intake 按影响面、未知数、决策成本和验证成本判断用户可见需求类型。',
+    '当前输入已被判定为可能的新功能/新流程方案（L2），因此进入重流程需求入口。不要按固定关键词判断；先用 $openprd-requirement-intake 按影响面、未知数、决策成本和验证成本判断用户可见需求类型。',
     '内部审查保留固定对照：快速修正=L0，现有功能优化=L1，新功能/新流程方案=L2。',
     '如果用户刚刚已经确认了现有功能优化（L1）的 mini-plan、范围边界或正式产品边界，下一句要明确写成“已确认，我按这个继续/收口/落地”；不要只写一个“确认”，更不要写成“确认，我们就按这个……”这种容易让用户误以为还要再表态的句子。',
     '如果需求类型是新功能/新流程方案（L2），本轮只围绕这个新需求推进 PRD/review/change/tasks，并选择 base/consumer/b2b/agent PRD lens，不自动继续历史 active change。',
@@ -2062,6 +2148,10 @@ function currentRequirementMessage(intent, gate, progress) {
   }
   lines.push(codexConfirmationReplyRule());
   return lines.filter(Boolean).join('\n');
+}
+
+function requirementRoutingSummary() {
+  return '需求类型由 $openprd-requirement-intake 按影响面、未知数、决策成本和验证成本判断：快速修正(L0)直接处理并事后说明，不打开正式 PRD/review/change/tasks；现有功能优化(L1)先给对话内 mini-plan，默认不生成正式 PRD/change/tasks；新功能/新流程方案(L2)才进入 requirement intake 与 PRD/review/change/tasks，并选择 base/consumer/b2b/agent PRD lens。只有在用户原始意图已明确要求实现，或后续明确发出执行指令时，才进入实现。';
 }
 
 function historicalRequirementReminder(root, runContext, intent, gate) {
@@ -2101,9 +2191,10 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
         currentRequirementMessage(intent, gate, effectiveProgress),
         historicalRequirementReminder(cwd, run.parsed, intent, gate),
         'OpenPrd 上下文只是建议，不是自动执行指令。请先判断用户当前意图。',
+        lightweightRequirementMessage(intent),
         visualMockupMessage(intent),
         largeUiVisualDirectionMessage(intent),
-        '需求类型由 $openprd-requirement-intake 按影响面、未知数、决策成本和验证成本判断：快速修正(L0)直接处理并事后说明，现有功能优化(L1)给对话内 mini-plan，新功能/新流程方案(L2)先走 PRD/review/change/tasks 并选择 base/consumer/b2b/agent PRD lens。只有在用户原始意图已明确要求实现，或后续明确发出执行指令时，才进入实现。',
+        requirementRoutingSummary(),
         '如果用户只是要求看看、规划、分析、审查、解释影响或列出文件，请保持只读并基于证据回答；不要运行 OpenPrd loop、任务推进、discovery 推进、commit 或其他写入命令。',
         '只有当用户当前明确要求开发、实现、修复、继续任务、深度调研、对标复刻或提交时，才运行 openprd loop --run、openprd tasks --advance、openprd discovery --advance、commit/push 等执行命令。',
         '代码修改完成后、最终回复前，针对本轮实际 touched code files 运行 openprd dev-check . <file...>；若出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，列出影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试。',
@@ -2119,9 +2210,10 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
       run.stdout,
       gateMessage,
       'OpenPrd 上下文只是建议，不是自动执行指令。请先判断用户当前意图。',
+      lightweightRequirementMessage(intent),
       visualMockupMessage(intent),
       largeUiVisualDirectionMessage(intent),
-      '需求类型由 $openprd-requirement-intake 按影响面、未知数、决策成本和验证成本判断：快速修正(L0)直接处理并事后说明，现有功能优化(L1)给对话内 mini-plan，新功能/新流程方案(L2)先走 PRD/review/change/tasks 并选择 base/consumer/b2b/agent PRD lens。只有在用户原始意图已明确要求实现，或后续明确发出执行指令时，才进入实现。',
+      requirementRoutingSummary(),
       '如果用户只是要求看看、规划、分析、审查、解释影响或列出文件，请保持只读并基于证据回答；不要运行 OpenPrd loop、任务推进、discovery 推进、commit 或其他写入命令。',
       '只有当用户当前明确要求开发、实现、修复、继续任务、深度调研、对标复刻或提交时，才运行 openprd loop --run、openprd tasks --advance、openprd discovery --advance、commit/push 等执行命令。',
       '代码修改完成后、最终回复前，针对本轮实际 touched code files 运行 openprd dev-check . <file...>；若出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，列出影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试。',
@@ -2143,9 +2235,10 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
     status.ok ? status.stdout : '',
     next.ok ? next.stdout : '',
     gateMessage,
+    lightweightRequirementMessage(intent),
     visualMockupMessage(intent),
     largeUiVisualDirectionMessage(intent),
-    '需求类型由 $openprd-requirement-intake 按影响面、未知数、决策成本和验证成本判断：快速修正(L0)直接处理并事后说明，现有功能优化(L1)给对话内 mini-plan，新功能/新流程方案(L2)先走 PRD/review/change/tasks 并选择 base/consumer/b2b/agent PRD lens。只有在用户原始意图已明确要求实现，或后续明确发出执行指令时，才进入实现。',
+    requirementRoutingSummary(),
     'OpenPrd 下一步只是建议。规划、分析、审查类请求保持只读；只有用户当前明确要求开发、深度调研、对标复刻或继续任务时才执行。',
     '代码修改完成后、最终回复前，针对本轮实际 touched code files 运行 openprd dev-check . <file...>；若出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，列出影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试。',
     '发现可沉淀项时不要中途打断任务：代码扩展识别这类白名单工具补全会自动应用并记录；用户偏好、项目协作规矩和 OpenPrd 默认行为先记录为候选，收工时运行 openprd grow . --review 集中确认。',

@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">OpenPrd 需求分流节奏</title>
+  <desc id="desc">一张说明 OpenPrd 如何把用户需求分成快速修正、现有功能优化和新功能新流程方案的流程图。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff8f1"/>
+      <stop offset="0.45" stop-color="#f8fbff"/>
+      <stop offset="1" stop-color="#f6f2ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M2 2 L10 6 L2 10 Z" fill="#475569"/>
+    </marker>
+    <style>
+      .eyebrow { font: 700 20px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 2px; fill: #2563eb; }
+      .title { font: 800 56px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 26px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #334155; }
+      .card-title { font: 800 28px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #111827; }
+      .card-body { font: 500 20px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .pill { font: 700 18px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #ffffff; }
+      .footer-title { font: 700 22px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .footer-body { font: 500 18px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .line { fill: none; stroke: #64748b; stroke-width: 4; marker-end: url(#arrow); }
+      .dash { fill: none; stroke: #94a3b8; stroke-width: 3; stroke-dasharray: 10 10; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" fill="url(#bg)"/>
+  <path d="M0 126 H1600 M0 292 H1600 M0 458 H1600 M0 624 H1600 M0 790 H1600 M190 0 V980 M390 0 V980 M590 0 V980 M790 0 V980 M990 0 V980 M1190 0 V980 M1390 0 V980" stroke="#dbeafe" stroke-width="1" opacity="0.65"/>
+
+  <g transform="translate(92 78)">
+    <text class="eyebrow" x="0" y="0">OPENPRD REQUIREMENT INTAKE</text>
+    <text class="title" x="0" y="78">一句需求进来，OpenPrd 怎么接住</text>
+    <text class="subtitle" x="2" y="126">先帮你把目标、场景和风险说清楚，再决定是直接改、先给 mini-plan，还是进入完整方案。</text>
+  </g>
+
+  <g transform="translate(96 220)" filter="url(#shadow)">
+    <rect width="420" height="280" rx="22" fill="#ffffff" stroke="#fdba74" stroke-width="2"/>
+    <rect x="30" y="28" width="104" height="38" rx="19" fill="#f97316"/>
+    <text class="pill" x="62" y="53">01</text>
+    <text class="card-title" x="30" y="108">快速修正</text>
+    <text class="card-body" x="30" y="152">问题已经很明确</text>
+    <text class="card-body" x="30" y="184">影响小，验收也清楚</text>
+    <text class="card-body" x="30" y="216">通常直接处理</text>
+    <text class="card-body" x="30" y="248">做完告诉你改了什么</text>
+    <text class="card-body" x="30" y="280">以及怎么验证</text>
+  </g>
+
+  <g transform="translate(590 220)" filter="url(#shadow)">
+    <rect width="420" height="280" rx="22" fill="#ffffff" stroke="#c4b5fd" stroke-width="2"/>
+    <rect x="30" y="28" width="104" height="38" rx="19" fill="#7c3aed"/>
+    <text class="pill" x="62" y="53">02</text>
+    <text class="card-title" x="30" y="108">现有功能优化</text>
+    <text class="card-body" x="30" y="152">目标明确</text>
+    <text class="card-body" x="30" y="184">但会牵动几个页面</text>
+    <text class="card-body" x="30" y="216">状态或用户动作</text>
+    <text class="card-body" x="30" y="248">先用人话给 mini-plan</text>
+    <text class="card-body" x="30" y="280">方向对了再继续</text>
+  </g>
+
+  <g transform="translate(1084 220)" filter="url(#shadow)">
+    <rect width="420" height="280" rx="22" fill="#ffffff" stroke="#86efac" stroke-width="2"/>
+    <rect x="30" y="28" width="104" height="38" rx="19" fill="#16a34a"/>
+    <text class="pill" x="62" y="53">03</text>
+    <text class="card-title" x="30" y="108">新功能 / 新流程方案</text>
+    <text class="card-body" x="30" y="152">范围更大，角色更多</text>
+    <text class="card-body" x="30" y="184">或业务风险还不清楚</text>
+    <text class="card-body" x="30" y="216">先讲清用户场景</text>
+    <text class="card-body" x="30" y="248">第一版、不做什么</text>
+    <text class="card-body" x="30" y="280">再进入完整方案</text>
+  </g>
+
+  <path class="line" d="M516 360 H578"/>
+  <path class="line" d="M1010 360 H1072"/>
+
+  <g transform="translate(220 566)" filter="url(#shadow)">
+    <rect width="1160" height="156" rx="24" fill="#ffffff" stroke="#dbeafe" stroke-width="2"/>
+    <text class="footer-title" x="40" y="54">你只需要先说明业务问题</text>
+    <text class="footer-body" x="40" y="90">谁在什么场景下遇到什么问题，想先解决哪一块。</text>
+    <path class="dash" d="M420 78 H520"/>
+    <text class="footer-title" x="560" y="54">OpenPrd 先帮你归纳</text>
+    <text class="footer-body" x="560" y="90">先讲目标、范围、先不做什么，以及主要风险。</text>
+    <path class="dash" d="M936 78 H1036"/>
+    <text class="footer-title" x="1074" y="54">再选合适的推进节奏</text>
+    <text class="footer-body" x="1074" y="90">避免一上来就重流程，也避免没说清就直接开做。</text>
+  </g>
+
+  <g transform="translate(120 792)" filter="url(#shadow)">
+    <rect width="1360" height="110" rx="24" fill="#ffffff" stroke="#dbeafe" stroke-width="2"/>
+    <circle cx="72" cy="55" r="28" fill="#fb923c"/>
+    <circle cx="460" cy="55" r="28" fill="#38bdf8"/>
+    <circle cx="864" cy="55" r="28" fill="#34d399"/>
+    <text class="footer-title" x="118" y="44">个人用户场景</text>
+    <text class="footer-body" x="118" y="74">更关注什么时候会用、第一下有没有感受到价值。</text>
+    <text class="footer-title" x="506" y="44">团队 / 企业流程</text>
+    <text class="footer-body" x="506" y="74">更关注谁拍板、谁使用、谁要推进上线。</text>
+    <text class="footer-title" x="910" y="44">Agent 协作</text>
+    <text class="footer-body" x="910" y="74">更关注哪些能自动做、哪里必须人工兜底。</text>
+  </g>
+</svg>

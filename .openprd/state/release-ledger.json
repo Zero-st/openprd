@@ -2,7 +2,7 @@
   "version": 1,
   "enabled": true,
   "strategy": "semver",
-  "currentVersion": "0.1.5",
+  "currentVersion": "0.1.6",
   "versions": [
     {
       "version": "0.1.2",
@@ -157,9 +157,9 @@
     },
     {
       "version": "0.1.5",
-      "status": "current",
+      "status": "released",
       "createdAt": "2026-06-05 09:02:25",
-      "updatedAt": "2026-06-05 09:02:25",
+      "updatedAt": "2026-06-05 12:35:25",
       "notes": null,
       "items": [
         {
@@ -208,8 +208,62 @@
         }
       ],
       "tag": null
+    },
+    {
+      "version": "0.1.6",
+      "status": "current",
+      "createdAt": "2026-06-05 12:35:24",
+      "updatedAt": "2026-06-05 12:35:25",
+      "notes": null,
+      "items": [
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "需求入口按快速修正、现有功能优化、新功能/新流程方案分流，L0/L1 默认不再走完整 PRD/change/tasks 流程",
+          "sentence": "优化：需求入口按快速修正、现有功能优化、新功能/新流程方案分流，L0/L1 默认不再走完整 PRD/change/tasks 流程",
+          "recordedAt": "2026-06-05 12:35:25",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780634125121"
+          }
+        },
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "clarify 默认先用业务和产品语言复述需求，并按 consumer、b2b、agent 视角聚焦场景、收益和风险",
+          "sentence": "优化：clarify 默认先用业务和产品语言复述需求，并按 consumer、b2b、agent 视角聚焦场景、收益和风险",
+          "recordedAt": "2026-06-05 12:35:25",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780634125234"
+          }
+        },
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "README 默认简体中文入口，新增中英文需求分流示意图，帮助非技术用户更快理解怎么提需求",
+          "sentence": "优化：README 默认简体中文入口，新增中英文需求分流示意图，帮助非技术用户更快理解怎么提需求",
+          "recordedAt": "2026-06-05 12:35:25",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780634125370"
+          }
+        },
+        {
+          "type": "修复",
+          "summary": "修复",
+          "detail": "Codex requirement gate 对局部修正和低风险优化更保守放行，只把高风险新流程和跨系统需求升级到完整 intake",
+          "sentence": "修复：Codex requirement gate 对局部修正和低风险优化更保守放行，只把高风险新流程和跨系统需求升级到完整 intake",
+          "recordedAt": "2026-06-05 12:35:25",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780634125494"
+          }
+        }
+      ],
+      "tag": null
     }
   ],
   "createdAt": "2026-06-02 21:28:04",
-  "updatedAt": "2026-06-05 09:02:25"
+  "updatedAt": "2026-06-05 12:35:25"
 }

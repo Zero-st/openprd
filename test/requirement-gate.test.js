@@ -222,7 +222,29 @@ describe('Codex requirement gate', () => {
       prompt: 'Windows用户反馈，他在更新新版本的时候，出现如图的一个报错，请你排查一下什么原因，并如果能定位到原因，直接帮我修复',
     });
     assert.equal(directBugfixPromptPayload.continue, true);
+    assert.ok(directBugfixPromptPayload.hookSpecificOutput.additionalContext.includes('快速修正 (L0)'));
+    assert.ok(directBugfixPromptPayload.hookSpecificOutput.additionalContext.includes('不打开正式 PRD/review/change/tasks'));
     assert.equal(await pathExists(path.join(project, '.openprd', 'harness', 'requirement-gate.json')), false);
+
+    const l1PromptPayload = runCodexHook(project, 'UserPromptSubmit', {
+      prompt: '把设置页的信息架构和默认筛选顺序优化一下，保持现有功能边界，直接改。',
+    });
+    assert.equal(l1PromptPayload.continue, true);
+    assert.ok(l1PromptPayload.hookSpecificOutput.additionalContext.includes('现有功能优化 (L1)'));
+    assert.ok(l1PromptPayload.hookSpecificOutput.additionalContext.includes('3-5 行 mini-plan'));
+    assert.ok(l1PromptPayload.hookSpecificOutput.additionalContext.includes('默认不要打开正式 PRD/review/change/tasks'));
+    assert.equal(await pathExists(path.join(project, '.openprd', 'harness', 'requirement-gate.json')), false);
+
+    const riskyBugfixPromptPayload = runCodexHook(project, 'UserPromptSubmit', {
+      prompt: '请直接修复支付回调和订单状态同步失败的问题，涉及登录态、订单回调和退款分支。',
+    });
+    assert.equal(riskyBugfixPromptPayload.continue, true);
+    assert.ok(riskyBugfixPromptPayload.hookSpecificOutput.additionalContext.includes('requirement intake gate'));
+    const riskyBugfixGate = JSON.parse(await fs.readFile(path.join(project, '.openprd', 'harness', 'requirement-gate.json'), 'utf8'));
+    assert.equal(riskyBugfixGate.active, true);
+    assert.equal(riskyBugfixGate.status, 'requires-clarification');
+
+    await fs.rm(path.join(project, '.openprd', 'harness', 'requirement-gate.json'));
 
     await fs.writeFile(path.join(project, '.openprd', 'harness', 'requirement-gate.json'), JSON.stringify({
       version: 1,
@@ -242,11 +264,8 @@ describe('Codex requirement gate', () => {
       tool_name: 'apply_patch',
       tool_input: '*** Begin Patch\n*** Update File: src/app.ts\n@@\n+// small follow-up edit\n*** End Patch',
     });
-    assert.equal(staleReadOnlyPatchPayload.decision, 'block');
-    assert.ok(
-      staleReadOnlyPatchPayload.reason.includes('requirement gate is still active')
-        || staleReadOnlyPatchPayload.reason.includes('OpenPrd blocked a mutating action')
-    );
+    assert.equal(staleReadOnlyPatchPayload.decision, undefined);
+    assert.equal(staleReadOnlyPatchPayload.continue, true);
   });
 
   test('Codex hook injects continuation lane context for historical session ID prompts', async () => {
@@ -856,8 +875,9 @@ test('Codex hook supports silent-record review lanes when the user opts out of e
     assert.equal(clarify.clarifyArtifact, null);
     assert.equal(clarify.clarifyArtifactBundle, null);
     assert.equal(await pathExists(path.join(project, '.openprd', 'engagements', 'active', 'clarify.html')), false);
-    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我理解的目标')));
-    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('适用对象')));
+    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我先用产品和业务语言复述一下')));
+    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('主要服务对象')));
+    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('这轮我会重点看哪些步骤让 Agent 自主完成')));
   });
 
   test('clarify keeps focused active requirement intake in the conversation', async () => {
@@ -876,9 +896,9 @@ test('Codex hook supports silent-record review lanes when the user opts out of e
     assert.equal(clarify.clarifyArtifact, null);
     assert.equal(clarify.clarifyArtifactBundle, null);
     assert.equal(await pathExists(path.join(project, '.openprd', 'engagements', 'active', 'clarify.html')), false);
-    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我理解的目标')));
-    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('建议确认')));
-    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('第一版先做')));
+    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我先用产品和业务语言复述一下')));
+    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我建议这轮先确认这一点')));
+    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('第一版先让用户做到')));
   });
 
   test('clarify keeps local visual cleanup requests inline even with inferred fields', async () => {
@@ -897,8 +917,8 @@ test('Codex hook supports silent-record review lanes when the user opts out of e
     assert.equal(clarify.clarifyArtifact, null);
     assert.equal(clarify.clarifyArtifactBundle, null);
     assert.equal(await pathExists(path.join(project, '.openprd', 'engagements', 'active', 'clarify.html')), false);
-    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我理解的目标')));
-    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('不能破坏')));
+    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我先用产品和业务语言复述一下')));
+    assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('必须守住')));
   });
 
   test('active requirement gate does not block freeze after reviewed PRD artifacts are confirmed', async () => {

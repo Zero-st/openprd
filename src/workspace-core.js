@@ -1817,13 +1817,13 @@ function buildClarificationState({ snapshot, analysis, basePlan, scenario, captu
       {
         id: 'existing-project-goal',
         label: '已有项目范围',
-        prompt: '基于当前已有项目，这一轮具体是为谁优化什么，第一版准备先落哪一块？',
+        prompt: '基于当前已有项目，这一轮主要是为谁改善什么问题，第一版准备先落哪一块最有价值？',
         reason: 'kickoff',
       },
       {
         id: 'reuse-boundary',
         label: '复用边界',
-        prompt: '哪些既有数据、流程或体验不能被破坏，哪些区域仍可调整？',
+        prompt: '哪些既有数据、流程、体验或业务结果不能被破坏，哪些区域仍可调整？',
         reason: 'kickoff',
       },
       ...missingQuestions,
@@ -1866,9 +1866,9 @@ function buildClarificationPlan(snapshot, analysis) {
   const mustAsk = analysis.missingFields.filter((field) => USER_CLARIFICATION_PATHS.has(field.path));
   const derived = analysis.missingFields.filter((field) => !USER_CLARIFICATION_PATHS.has(field.path));
   const kickoffQuestions = [
-    { id: 'project-overview', label: '项目轮廓', prompt: '这件事整体更像什么产品或能力，它主要是给谁用的？' },
-    { id: 'first-slice', label: '首版切片', prompt: '如果先做第一版，最小可用切片应该先覆盖什么？' },
-    { id: 'guardrails', label: '保护项', prompt: '这轮有哪些明确不做的内容，或者哪些既有能力不能被破坏？' },
+    { id: 'project-overview', label: '项目轮廓', prompt: '这件事主要是给谁用的，他们会在什么场景下最先感受到价值？' },
+    { id: 'first-slice', label: '首版切片', prompt: '如果先做第一版，最值得先让用户完成什么关键动作？' },
+    { id: 'guardrails', label: '保护项', prompt: '这轮明确先不做什么，或者哪些既有体验、流程和业务结果不能被影响？' },
   ];
   return {
     totalRequiredFields: analysis.totalRequiredFields,

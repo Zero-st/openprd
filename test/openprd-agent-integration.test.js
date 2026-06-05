@@ -567,8 +567,8 @@ test('clarify treats legacy artifact mode as an inline checklist', async () => {
   assert.equal(clarify.clarifyArtifactBundle, null);
   assert.equal(clarify.opened, false);
   assert.equal(await pathExists(path.join(project, '.openprd', 'engagements', 'active', 'clarify.html')), false);
-  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我理解的目标')));
-  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('适用对象')));
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我先用产品和业务语言复述一下')));
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('主要服务对象')));
 });
 
 test('doctor fails when Codex hook emits legacy output schema', async () => {
