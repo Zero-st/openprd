@@ -41,7 +41,7 @@ If your teammates often say “we kind of know what we want, but it is not fully
 
 You do not need to decide whether your request is `L0 / L1 / L2`, and you do not need a technical design up front. Start with business language: who is stuck, in what situation, and what you want fixed first. OpenPrd helps turn that into the right working rhythm.
 
-![OpenPrd requirement routing](https://raw.githubusercontent.com/mileson/openprd/main/docs/assets/openprd-requirement-routing-en.svg)
+![OpenPrd requirement routing](https://raw.githubusercontent.com/mileson/openprd/main/docs/assets/openprd-requirement-routing-en.png)
 
 - **Quick fix**: the problem is already clear, the blast radius is small, and success is easy to verify. OpenPrd usually handles it directly and then reports back what changed and how it was checked.
 - **Existing-flow improvement**: the goal is clear, but it affects several screens, states, or user actions. OpenPrd first gives a plain-language mini-plan, then continues once the direction is aligned.

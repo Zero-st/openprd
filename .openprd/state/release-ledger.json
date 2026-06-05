@@ -2,7 +2,7 @@
   "version": 1,
   "enabled": true,
   "strategy": "semver",
-  "currentVersion": "0.1.6",
+  "currentVersion": "0.1.7",
   "versions": [
     {
       "version": "0.1.2",
@@ -211,9 +211,9 @@
     },
     {
       "version": "0.1.6",
-      "status": "current",
+      "status": "released",
       "createdAt": "2026-06-05 12:35:24",
-      "updatedAt": "2026-06-05 12:35:25",
+      "updatedAt": "2026-06-05 17:33:02",
       "notes": null,
       "items": [
         {
@@ -262,8 +262,29 @@
         }
       ],
       "tag": null
+    },
+    {
+      "version": "0.1.7",
+      "status": "current",
+      "createdAt": "2026-06-05 17:33:02",
+      "updatedAt": "2026-06-05 17:33:16",
+      "notes": null,
+      "items": [
+        {
+          "type": "调整",
+          "summary": "调整",
+          "detail": "更新 README 需求分流图为 AI 生成的 PNG 版本，默认展示正式中英文路由图",
+          "sentence": "调整：更新 README 需求分流图为 AI 生成的 PNG 版本，默认展示正式中英文路由图",
+          "recordedAt": "2026-06-05 17:33:16",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780651996954"
+          }
+        }
+      ],
+      "tag": null
     }
   ],
   "createdAt": "2026-06-02 21:28:04",
-  "updatedAt": "2026-06-05 12:35:25"
+  "updatedAt": "2026-06-05 09:33:26"
 }
