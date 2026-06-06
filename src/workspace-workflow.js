@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { analyzePrdSnapshot, buildPrdSnapshot, diffSnapshots, formatVersionId, renderPrdMarkdown, summarizeSnapshot } from './prd-core.js';
+import { formatProductTypeDisplay, formatProductTypeOptions, formatProductTypeQuestion, formatProductTypeSentence, formatTemplatePackDisplay } from './product-type-copy.js';
 import { getDiagramReviewState } from './diagram-workspace.js';
 import { exists, parseYamlText, readJson, readText, writeJson, writeText } from './fs-utils.js';
 import { artifactBundlePaths, canonicalReviewPath, defaultReviewArtifactPath, openArtifactInBrowser, renderPlaygroundArtifact, renderPlaygroundMarkdown, renderPlaygroundPatch, renderReviewArtifact, renderReviewEntryHtml, writeHtmlArtifact } from './html-artifacts.js';
@@ -443,26 +444,20 @@ function normalizeTextList(items) {
 }
 
 function summarizeProductShape(productType, gate) {
-  if (productType === 'consumer') {
-    return '当前更像面向个人用户或 C 端体验的产品。';
-  }
-  if (productType === 'b2b') {
-    return '当前更像面向团队、企业或后台流程的产品。';
-  }
-  if (productType === 'agent') {
-    return '当前更像面向 Agent、自动化或人机协作的产品。';
+  if (productType === 'consumer' || productType === 'b2b' || productType === 'agent' || productType === 'base') {
+    return formatProductTypeSentence(productType);
   }
   const text = requirementPrompt(gate);
   if (/agent|自动化|workflow|MCP|tool|skill/i.test(text)) {
-    return '从当前描述看，更像 Agent、自动化或人机协作方向。';
+    return formatProductTypeSentence('agent', { inferred: true });
   }
   if (/企业|团队|后台|审批|权限|客户|运营/i.test(text)) {
-    return '从当前描述看，更像团队、企业或后台流程方向。';
+    return formatProductTypeSentence('b2b', { inferred: true });
   }
   if (/个人|用户|社区|内容|创作者|消费|c端|to c/i.test(text)) {
-    return '从当前描述看，更像个人用户或 C 端体验方向。';
+    return formatProductTypeSentence('consumer', { inferred: true });
   }
-  return '产品形态仍待确认，可在 consumer / b2b / agent 之间进一步锁定。';
+  return `产品场景仍待确认，可在 ${formatProductTypeOptions()} 之间进一步锁定。`;
 }
 
 function summarizeArchitectureSignals(gate, snapshot) {
@@ -472,7 +467,7 @@ function summarizeArchitectureSignals(gate, snapshot) {
     dependencies: sections.constraints?.dependencies ?? [],
   })}`;
   const hits = [];
-  if (/前端|页面|客户端|web|h5|移动端|ios|android|桌面|ui|交互/i.test(text)) {
+  if (/前端|页面|客户端|web|h5|移动端|ios|android|桌面|ui|交互|网站|站点|博客|内容|文章|落地页/i.test(text)) {
     hits.push('用户入口与页面体验');
   }
   if (/后端|服务端|server|api|数据库|存储|队列|定时任务|cron|webhook/i.test(text)) {
@@ -553,6 +548,171 @@ function describeProductLensFocus(productType) {
     return '这轮我会重点看哪些步骤让 Agent 自主完成、哪些节点必须人工拍板，以及失败时谁兜底。';
   }
   return '这轮我会优先把用户、场景、第一版切片、边界和风险讲清楚。';
+}
+
+function requirementTypeDisplay(gate) {
+  const tier = String(gate?.intent?.requirementTier ?? '').toLowerCase();
+  if (tier === 'l0') {
+    return '快速修正（L0）';
+  }
+  if (tier === 'l1') {
+    return '现有功能优化（L1）';
+  }
+  return '新功能/新流程方案（L2）';
+}
+
+function inferredProductTypeDisplay(productType, gate) {
+  if (productType === 'consumer' || productType === 'b2b' || productType === 'agent' || productType === 'base') {
+    return formatProductTypeDisplay(productType);
+  }
+  const text = requirementPrompt(gate);
+  if (/agent|自动化|workflow|MCP|tool|skill/i.test(text)) {
+    return formatProductTypeDisplay('agent');
+  }
+  if (/企业|团队|后台|审批|权限|客户|运营/i.test(text)) {
+    return formatProductTypeDisplay('b2b');
+  }
+  if (/个人|用户|社区|内容|创作者|消费|c端|to c/i.test(text)) {
+    return formatProductTypeDisplay('consumer');
+  }
+  return '待确认';
+}
+
+function fallbackScopeText(text, fallback) {
+  return containsPendingClarifyMarker(text) ? fallback : text;
+}
+
+function buildMarkdownTable(headers, rows) {
+  const normalizedRows = rows
+    .filter((row) => Array.isArray(row) && row.length > 0)
+    .map((row) => headers.map((_, index) => escapeMarkdownTableCell(row[index] ?? '待确认')));
+  return [
+    `| ${headers.map(escapeMarkdownTableCell).join(' | ')} |`,
+    `| ${headers.map(() => '---').join(' | ')} |`,
+    ...normalizedRows.map((row) => `| ${row.join(' | ')} |`),
+  ];
+}
+
+function inferCoreScopeModule(prompt, productType) {
+  const text = String(prompt ?? '');
+  if (/页面|界面|布局|导航|按钮|表单|网站|站点|博客|内容|文章|落地页|UI/i.test(text)) {
+    return '用户入口与界面';
+  }
+  if (/后端|服务端|接口|api|数据库|存储|同步|队列|webhook|数据/i.test(text)) {
+    return '服务流程与数据处理';
+  }
+  if (/agent|自动化|workflow|tool|skill|MCP|编排/i.test(text) || productType === 'agent') {
+    return 'Agent 主流程';
+  }
+  return '核心主流程';
+}
+
+function pushScopeRow(rows, seen, module, inScope, outOfScope) {
+  const key = String(module ?? '').trim();
+  if (!key || seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  rows.push([module, inScope, outOfScope]);
+}
+
+function buildScopeTableRows({ projectFraming, prompt, productType }) {
+  const rows = [];
+  const seen = new Set();
+  const text = `${prompt ?? ''} ${projectFraming.architectureSignals ?? ''}`;
+  const firstSlice = fallbackScopeText(
+    projectFraming.firstSlice,
+    '先把第一版核心主流程收敛到一个最小可交付闭环。'
+  );
+  const nonGoals = fallbackScopeText(
+    projectFraming.nonGoals,
+    '暂不把与核心目标无关的大范围扩展一起塞进第一版。'
+  );
+  if (/用户入口与页面体验|页面|界面|布局|导航|按钮|表单|网站|站点|博客|内容|文章|落地页|UI/i.test(text)) {
+    pushScopeRow(
+      rows,
+      seen,
+      '用户入口与界面',
+      containsPendingClarifyMarker(projectFraming.firstSlice)
+        ? '先把用户看到的入口、页面结构和关键交互讲清楚。'
+        : firstSlice,
+      nonGoals,
+    );
+  }
+  if (/服务流程与数据处理|后端|服务端|接口|api|数据库|存储|同步|队列|webhook|数据/i.test(text)) {
+    pushScopeRow(
+      rows,
+      seen,
+      '服务流程与数据处理',
+      '先只覆盖支撑主流程所需的接口、状态处理或数据留痕。',
+      '暂不扩到与这次主流程无关的重构、清库或系统级迁移。',
+    );
+  }
+  if (/Agent 协作与自动执行|agent|自动化|workflow|tool|skill|MCP|编排/i.test(text) || productType === 'agent') {
+    pushScopeRow(
+      rows,
+      seen,
+      'Agent 主流程',
+      '先讲清 Agent 负责的步骤、人工确认点和失败恢复。',
+      '暂不把所有自动化场景一次性铺开，避免边界失控。',
+    );
+  }
+  if (rows.length === 0) {
+    pushScopeRow(rows, seen, inferCoreScopeModule(prompt, productType), firstSlice, nonGoals);
+  }
+  return rows;
+}
+
+function pushTechRow(rows, seen, area, approach, responsibility) {
+  const key = String(area ?? '').trim();
+  if (!key || seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  rows.push([area, approach, responsibility]);
+}
+
+function buildTechnicalSolutionRows({ projectFraming, prompt, productType }) {
+  const rows = [];
+  const seen = new Set();
+  const text = `${prompt ?? ''} ${projectFraming.architectureSignals ?? ''}`;
+  if (/用户入口与页面体验|页面|界面|布局|导航|按钮|表单|网站|站点|博客|内容|文章|落地页|UI/i.test(text)) {
+    pushTechRow(
+      rows,
+      seen,
+      '前端 / 用户入口',
+      '先围绕当前入口、页面结构和关键交互做第一版，不提前铺开大范围视觉重做。',
+      '负责把用户真正看到的流程、反馈和操作路径讲清楚。',
+    );
+  }
+  if (/服务流程与数据处理|后端|服务端|接口|api|数据库|存储|同步|队列|webhook|数据/i.test(text)) {
+    pushTechRow(
+      rows,
+      seen,
+      '后端 / 服务逻辑',
+      '只补当前需求真正需要的接口、状态流转或数据写入，先保证主链路跑通。',
+      '负责把规则、状态和数据处理接住，并留下可验证证据。',
+    );
+  }
+  if (/Agent 协作与自动执行|agent|自动化|workflow|tool|skill|MCP|编排/i.test(text) || productType === 'agent') {
+    pushTechRow(
+      rows,
+      seen,
+      'Agent / 自动化编排',
+      '先定义 Agent 自主边界、人工拍板点和失败恢复，再决定要不要继续扩编排深度。',
+      '负责把多步流程串起来，并在失败时把用户安全带回人工兜底。',
+    );
+  }
+  if (rows.length === 0) {
+    pushTechRow(
+      rows,
+      seen,
+      '实现主链路',
+      '先按当前确认范围做最小可用闭环，再决定是否扩展到更多技术面。',
+      '负责把第一版能力真正落到可验证的主流程里。',
+    );
+  }
+  return rows;
 }
 
 function buildClarifyDirectionChoices(productType) {
@@ -643,6 +803,14 @@ function buildInlineClarification({ clarification, reflection, presentation }) {
   const productType = projectContext.productType;
   const primaryQuestion = clarification.mustAskUser[0] ?? null;
   const followUpQuestions = clarification.mustAskUser.slice(1, presentation.mode === 'inline' ? 2 : 3);
+  const scopeTable = buildMarkdownTable(
+    ['功能模块', '这次先做什么', '这次先不做什么'],
+    buildScopeTableRows({ projectFraming, prompt, productType }),
+  );
+  const technicalTable = buildMarkdownTable(
+    ['技术部分', '初步方案', '主要负责什么'],
+    buildTechnicalSolutionRows({ projectFraming, prompt, productType }),
+  );
   const directionChoices = (
     containsPendingClarifyMarker(projectFraming.firstSlice)
     || containsPendingClarifyMarker(projectFraming.audience)
@@ -650,24 +818,38 @@ function buildInlineClarification({ clarification, reflection, presentation }) {
     ? buildClarifyDirectionChoices(productType)
     : [];
   const lines = [
-    `我先用产品和业务语言复述一下：${prompt}`,
-    `主要服务对象：${projectFraming.audience ?? '待确认'}。`,
-    `使用场景更像：${projectFraming.productShape ?? '待确认'}。`,
-    `第一版先让用户做到：${projectFraming.firstSlice ?? '待确认'}。`,
-    `这轮先不碰：${projectFraming.nonGoals ?? '待确认'}。`,
-    `必须守住：${projectFraming.guardrails ?? '待确认'}。`,
-    describeProductLensFocus(productType),
+    `我先用产品和业务语言复述一下这次需求，并先按总分结构收一下：${prompt}`,
+    '',
+    '需求判断：',
+    `- 需求类型：${requirementTypeDisplay(reflection?.gate)}。`,
+    `- 产品类型：${inferredProductTypeDisplay(productType, reflection?.gate)}。`,
+    '',
+    '需求理解：',
+    `- 主要服务对象：${projectFraming.audience ?? '待确认'}。`,
+    `- 使用场景更像：${projectFraming.productShape ?? '待确认'}。`,
+    `- 第一版先让用户做到：${projectFraming.firstSlice ?? '待确认'}。`,
+    `- 这轮先不碰：${projectFraming.nonGoals ?? '待确认'}。`,
+    `- 必须守住：${projectFraming.guardrails ?? '待确认'}。`,
   ];
   if (projectFraming.architectureSignals) {
-    lines.push(`这次会影响的环节：${projectFraming.architectureSignals}。`);
+    lines.push(`- 这次更可能会影响：${projectFraming.architectureSignals}。`);
   }
   if (projectFraming.riskProbes?.length > 0) {
-    lines.push(`我先提醒的业务风险：${projectFraming.riskProbeSummary}。`);
+    lines.push(`- 我先提醒的业务风险：${projectFraming.riskProbeSummary}。`);
   }
-  lines.push('判断这轮是否值得做成：看用户是否真的更顺、更快、更稳地完成关键动作。');
+  lines.push(`- ${describeProductLensFocus(productType)}`);
+  lines.push('- 判断这轮是否值得做成：看用户是否真的更顺、更快、更稳地完成关键动作。');
+  lines.push('');
+  lines.push('功能范围：');
+  lines.push(...scopeTable);
+  lines.push('');
+  lines.push('技术方案：');
+  lines.push(...technicalTable);
   if (projectContext.activeChange) {
+    lines.push('');
     lines.push(`历史提醒：当前还有 ${projectContext.activeChange.activeChange}，本轮先分开处理。`);
   }
+  lines.push('');
   if (primaryQuestion) {
     lines.push('我建议这轮先确认这一点：');
     lines.push(`- ${primaryQuestion.prompt}`);
@@ -685,8 +867,11 @@ function buildInlineClarification({ clarification, reflection, presentation }) {
     for (const choice of directionChoices) {
       lines.push(`- ${choice}`);
     }
+    lines.push('你可以先回一个方向编号，或直接补一句你的倾向。');
+    lines.push('我收到后会先整理需求摘要给你确认；确认后再进入 PRD 和评审流程，不会直接跳到实现。');
   } else {
-    lines.push('如果以上理解正确，用户回复“可以”或“确认执行”后再继续。');
+    lines.push('如果以上理解基本对，请先回复“可以”，或直接指出要调整的地方。');
+    lines.push('我收到后会先整理需求摘要给你确认；确认后再进入 PRD 和评审流程，不会直接跳到实现。');
   }
   return {
     mode: presentation.mode,
@@ -823,7 +1008,7 @@ async function buildRequirementIntakeReflection({ projectRoot, ws, snapshot, ana
         title: '第 2 轮：项目上下文映射',
         findings: [
           `工作区场景：${scenario.label}，${scenario.reason}`,
-          `当前产品：${productName}（${productType}），已记录问题：${currentProblem}`,
+          `当前产品：${productName}；当前产品场景：${formatProductTypeDisplay(productType, { fallback: '待确认' })}；已记录问题：${currentProblem}`,
           `当前范围线索：${currentScope}`,
           `首轮画像：用户群体=${projectFraming.audience}；产品形态=${projectFraming.productShape}；第一版先做=${projectFraming.firstSlice}`,
           activeChange ? `仍有 active change：${activeChange.activeChange}（${activeChange.status}），需要和本轮需求分开评估。` : '当前没有检测到 active change 冲突。',
@@ -859,7 +1044,7 @@ function renderRequirementIntakeReflection(reflection) {
     '## 项目上下文',
     '',
     `- 工作区场景: ${reflection.projectContext.scenario}`,
-    `- 当前产品: ${reflection.projectContext.productName} (${reflection.projectContext.productType})`,
+    `- 当前产品: ${reflection.projectContext.productName}；产品场景: ${formatProductTypeDisplay(reflection.projectContext.productType, { fallback: '待确认' })}`,
     `- 当前问题: ${reflection.projectContext.currentProblem}`,
     `- 当前范围: ${reflection.projectContext.currentScope}`,
     reflection.projectContext.activeChange ? `- 历史 active change: ${reflection.projectContext.activeChange.activeChange}` : '- 历史 active change: 无',
@@ -1116,14 +1301,13 @@ async function synthesizeWorkspace(projectRoot, overrides = {}) {
     reviewPresentationRequired: !presentationGate.ok,
   });
   await appendDecision(ws, [
-    `已生成版本 ${snapshot.versionId}。`,
-    `产品类型: ${snapshot.productType ?? '未分类'}。`,
-    `模板包: ${snapshot.templatePack}。`,
-    `Digest: ${snapshot.digest}.`,
+    `已整理出一版可确认的需求稿。`,
+    `产品场景: ${formatProductTypeDisplay(snapshot.productType, { fallback: '待确认' })}。`,
+    `场景模板: ${formatTemplatePackDisplay(snapshot.templatePack, { fallback: '待确认' })}。`,
   ]);
   await appendProgress(ws, [
-    `已生成 PRD 快照 ${snapshot.versionId}。`,
-    `已更新当前 PRD、流程、角色和交接文档。`,
+    '已生成新的需求确认稿。',
+    '已同步更新当前需求、流程、角色和交接说明。',
     presentationGate.ok
       ? `已生成可确认评审面板: ${reviewFiles.canonicalReview}。`
       : '评审面板暂未生成：需要先通过 openprd review-presentation 写入展示文案。',
@@ -1230,8 +1414,16 @@ async function reviewWorkspace(projectRoot, options = {}) {
   if (!(await exists(ws.workspaceRoot))) {
     throw new Error(`Missing workspace: ${ws.workspaceRoot}`);
   }
-  const latest = await loadCurrentLaneSnapshot(ws, { fallbackToLatest: !ws.data.currentSessionId });
-  if (!latest?.snapshot) {
+  const requestedVersion = normalizeVersionId(options.version);
+  const latest = await loadCurrentLaneSnapshot(ws, {
+    fallbackToLatest: !ws.data.currentSessionId || Boolean(requestedVersion),
+  });
+  const fallbackLatest = latest?.snapshot ? latest : (requestedVersion ? await loadLatestVersionSnapshot(ws) : null);
+  const latestSnapshot = fallbackLatest?.snapshot ?? null;
+  const snapshot = requestedVersion
+    ? await readVersionSnapshot(ws, requestedVersion)
+    : latestSnapshot;
+  if (!snapshot) {
     return {
       ok: false,
       action: 'review',
@@ -1239,12 +1431,7 @@ async function reviewWorkspace(projectRoot, options = {}) {
       errors: ['No synthesized PRD version exists yet. Run openprd synthesize first.'],
     };
   }
-
-  const requestedVersion = normalizeVersionId(options.version);
-  const snapshot = requestedVersion
-    ? await readVersionSnapshot(ws, requestedVersion)
-    : latest.snapshot;
-  if (!snapshot) {
+  if (requestedVersion && normalizeVersionId(snapshot.versionId) !== requestedVersion) {
     return {
       ok: false,
       action: 'review',
@@ -1268,10 +1455,10 @@ async function reviewWorkspace(projectRoot, options = {}) {
 
   const validationErrors = [];
   if (options.digest && options.digest !== snapshot.digest) {
-    validationErrors.push(`Digest mismatch for ${snapshot.versionId}: expected ${snapshot.digest}, got ${options.digest}.`);
+    validationErrors.push(`确认指纹不匹配：当前稿件与传入参数不是同一版，请重新从确认页面复制这次确认命令。`);
   }
   if (requestedWorkUnitId && snapshot.workUnitId !== requestedWorkUnitId) {
-    validationErrors.push(`Work unit mismatch for ${snapshot.versionId}: expected ${snapshot.workUnitId ?? 'none'}, got ${requestedWorkUnitId}.`);
+    validationErrors.push('这次确认命令对应的稿件不一致，请重新从当前确认页面复制命令后再执行。');
   }
   if (validationErrors.length > 0) {
     return {
@@ -1285,7 +1472,7 @@ async function reviewWorkspace(projectRoot, options = {}) {
     };
   }
 
-  const isLatest = normalizeVersionId(snapshot.versionId) === normalizeVersionId(latest.snapshot.versionId);
+  const isLatest = normalizeVersionId(snapshot.versionId) === normalizeVersionId((latestSnapshot ?? snapshot).versionId);
   const presentationGate = getReviewPresentationGate(snapshot);
   if (!presentationGate.ok) {
     return {
@@ -1754,9 +1941,9 @@ async function computeWorkspaceGuidance(ws, options = {}) {
     suggestedQuestions = clarification.mustAskUser.map((item) => item.prompt);
   } else if (!hasProductType) {
     nextAction = 'classify';
-    reason = '产品类型尚未锁定。';
+    reason = '产品场景尚未锁定。';
     suggestedCommand = 'openprd classify . <consumer|b2b|agent>';
-    suggestedQuestions = ['这是 consumer、b2b 还是 agent 产品？'];
+    suggestedQuestions = [formatProductTypeQuestion()];
   } else if (analysis.missingRequiredFields > 0) {
     nextAction = 'interview';
     reason = `仍缺少 ${analysis.missingRequiredFields} 个必填字段。`;
@@ -1919,11 +2106,11 @@ async function classifyWorkspace(projectRoot, productType) {
   const storedCurrentState = await persistWorkspaceCurrentState(ws, currentState);
   await appendWorkflowEvent(ws, 'classified', { productType });
   await appendDecision(ws, [
-    `已锁定产品类型为 ${productType}。`,
-    `模板包已设置为 ${productType}。`,
+    `已锁定产品场景为 ${formatProductTypeDisplay(productType, { fallback: productType })}。`,
+    `场景模板已设置为 ${formatTemplatePackDisplay(productType, { fallback: productType })}。`,
   ]);
   await appendProgress(ws, [
-    `已将工作区分类为 ${productType}。`,
+    `已将工作区产品场景锁定为 ${formatProductTypeDisplay(productType, { fallback: productType })}。`,
   ]);
   await writeJson(ws.paths.taskGraph, buildWorkflowTaskGraph(storedCurrentState));
 
@@ -1968,7 +2155,7 @@ ${content}`);
     sourceFiles: sourceFiles.map((filePath) => path.relative(ws.workspaceRoot, filePath)),
   });
   await appendProgress(ws, [
-    `已加载 ${productType ?? '未分类'} 的访谈问题。`,
+    `已加载 ${formatProductTypeDisplay(productType, { fallback: '待确认' })} 的访谈问题。`,
     `来源文件: ${sourceFiles.map((filePath) => path.relative(ws.workspaceRoot, filePath)).join(', ')}`,
   ]);
   const openQuestions = [

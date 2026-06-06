@@ -171,6 +171,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.equal(generatedAgents.includes('weapp-dev-mcp'), false);
     assert.ok(generatedAgents.includes('resolve_library_id -> query_docs'));
     assert.ok(generatedAgents.includes('Codex 原生 Image 2'));
+    assert.ok(generatedAgents.includes('imagegen'));
     assert.ok(generatedAgents.includes('独立素材输出（standalone asset）'));
     assert.equal(generatedAgents.includes('## Skill Routing'), false);
     assert.equal(generatedAgents.includes('## Tool Reality'), false);
@@ -189,8 +190,12 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     const generatedIntakeSkill = await fs.readFile(path.join(project, '.codex', 'skills', 'openprd-requirement-intake', 'SKILL.md'), 'utf8');
     assert.ok(generatedIntakeSkill.includes('## 分流原则'));
     assert.ok(generatedIntakeSkill.includes('不要按关键词判断'));
+    assert.ok(generatedIntakeSkill.includes('requirement write path'));
+    assert.ok(generatedIntakeSkill.includes('需求判断 / 需求理解 / 功能范围 / 技术方案'));
+    assert.ok(generatedIntakeSkill.includes('技术部分 | 初步方案 | 主要负责什么'));
     assert.ok(generatedIntakeSkill.includes('base'));
     assert.ok(generatedIntakeSkill.includes('consumer'));
+    assert.ok(generatedIntakeSkill.includes('面向个人消费者场景'));
     assert.ok(generatedIntakeSkill.includes('b2b'));
     assert.ok(generatedIntakeSkill.includes('agent'));
     const generatedIntakeRubric = await fs.readFile(path.join(project, '.codex', 'skills', 'openprd-requirement-intake', 'references', 'routing-rubric.md'), 'utf8');
@@ -204,6 +209,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.ok(generatedCommandCatalog.includes('openprd loop . --run --agent codex|claude --dry-run'));
     assert.ok(generatedCommandCatalog.includes('openprd visual-compare . --reference <效果图> --actual <实现截图>'));
     assert.ok(generatedCommandCatalog.includes('openprd visual-compare . --before <修改前截图> --after <修改后截图>'));
+    assert.ok(generatedCommandCatalog.includes('openprd visual-compare . --board <board.json>'));
     assert.ok(generatedCommandCatalog.includes('openprd quality . --verify'));
     assert.ok(generatedCommandCatalog.includes('如果只剩 `feature-coverage`'));
     const generatedBenchmarkSkill = await fs.readFile(path.join(project, '.codex', 'skills', 'openprd-benchmark-router', 'SKILL.md'), 'utf8');
@@ -278,15 +284,20 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.ok(generatedHarnessSkill.includes('执行确认清单'));
     assert.ok(generatedHarnessSkill.includes('已确认，我按这个继续'));
     assert.ok(generatedHarnessSkill.includes('不能只要求用户回复一句确认'));
+    assert.ok(generatedHarnessSkill.includes('先整理需求摘要给你确认'));
+    assert.ok(generatedHarnessSkill.includes('你回我一句我就开始实现'));
     const generatedCodexHook = await fs.readFile(path.join(project, '.codex', 'hooks', 'openprd-hook.mjs'), 'utf8');
     assert.ok(generatedCodexHook.includes('执行确认清单'));
     assert.ok(generatedCodexHook.includes('已确认，我按这个继续'));
-    assert.ok(generatedCodexHook.includes('不要只要求用户回复一句确认'));
+    assert.ok(generatedCodexHook.includes('不要再写“如果你认可”'));
+    assert.ok(generatedCodexHook.includes('先整理需求摘要给你确认'));
+    assert.ok(generatedCodexHook.includes('你回我一句我就开始实现'));
     const generatedVisualCommand = await fs.readFile(path.join(project, '.codex', 'prompts', 'openprd-visual-compare.md'), 'utf8');
     assert.ok(generatedVisualCommand.includes('side-by-side JPG'));
     assert.ok(generatedVisualCommand.includes('效果图'));
     assert.ok(generatedVisualCommand.includes('实现截图'));
     assert.ok(generatedVisualCommand.includes('before/after'));
+    assert.ok(generatedVisualCommand.includes('--board <board.json>'));
     const fakeCodexBin = await writeFakeCodexBin(project);
 
     const logs = [];
@@ -354,7 +365,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
       env: {
         ...process.env,
         PATH: `${fakeCodexBin}${path.delimiter}${process.env.PATH}`,
-        OPENPRD_CLI: path.resolve('bin/openprd.js'),
+        OPENPRD_CLI: path.resolve('openprd/bin/openprd.js'),
       },
     });
     assert.equal(hookResult.status, 0);
@@ -376,7 +387,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
       encoding: 'utf8',
       env: {
         ...process.env,
-        OPENPRD_CLI: path.resolve('bin/openprd.js'),
+        OPENPRD_CLI: path.resolve('openprd/bin/openprd.js'),
       },
     });
     assert.equal(lowRiskResult.status, 0);
@@ -396,7 +407,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
       encoding: 'utf8',
       env: {
         ...process.env,
-        OPENPRD_CLI: path.resolve('bin/openprd.js'),
+        OPENPRD_CLI: path.resolve('openprd/bin/openprd.js'),
       },
     });
     assert.equal(successPostResult.status, 0);
@@ -411,7 +422,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
       encoding: 'utf8',
       env: {
         ...process.env,
-        OPENPRD_CLI: path.resolve('bin/openprd.js'),
+        OPENPRD_CLI: path.resolve('openprd/bin/openprd.js'),
       },
     });
     assert.equal(sessionStartResult.status, 0);
@@ -428,7 +439,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
         encoding: 'utf8',
         env: {
           ...process.env,
-          OPENPRD_CLI: path.resolve('bin/openprd.js'),
+          OPENPRD_CLI: path.resolve('openprd/bin/openprd.js'),
         },
       });
       assert.equal(eventResult.status, 0);
@@ -437,7 +448,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
       assert.equal(eventPayload.should_stop, undefined);
       assert.equal(eventPayload.additional_contexts, undefined);
       assert.equal(eventPayload.hookSpecificOutput.hookEventName, eventName);
-      assert.ok(eventPayload.hookSpecificOutput.additionalContext.includes('OpenPrd 运行上下文'));
+      assert.ok(eventPayload.hookSpecificOutput.additionalContext.includes('当前进展参考'));
       assert.ok(eventPayload.hookSpecificOutput.additionalContext.includes('OpenPrd 上下文只是建议'));
       assert.equal(eventPayload.hookSpecificOutput.additionalContext.includes('Follow the recommended OpenPrd run command'), false);
     }
@@ -569,6 +580,8 @@ test('clarify treats legacy artifact mode as an inline checklist', async () => {
   assert.equal(await pathExists(path.join(project, '.openprd', 'engagements', 'active', 'clarify.html')), false);
   assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我先用产品和业务语言复述一下')));
   assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('主要服务对象')));
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('| 功能模块 |')));
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('| 技术部分 |')));
 });
 
 test('doctor fails when Codex hook emits legacy output schema', async () => {

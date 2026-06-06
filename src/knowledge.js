@@ -1,14 +1,18 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { cjoin, exists, readJson, writeJson, writeText } from './fs-utils.js';
+import { appendJsonl, cjoin, exists, readJson, readJsonl, writeJson, writeText } from './fs-utils.js';
 import { resolveQualityLearningSource } from './quality-learning.js';
 import { timestamp } from './time.js';
 
 const KNOWLEDGE_DIR = cjoin('.openprd', 'knowledge');
 const KNOWLEDGE_INDEX = cjoin(KNOWLEDGE_DIR, 'index.json');
+const KNOWLEDGE_SKILLS_DIR = cjoin(KNOWLEDGE_DIR, 'skills');
 const KNOWLEDGE_CANDIDATES_DIR = cjoin(KNOWLEDGE_DIR, 'candidates');
 const KNOWLEDGE_DRAFTS_DIR = cjoin(KNOWLEDGE_DIR, 'drafts');
+const KNOWLEDGE_ADOPTION_LOG = cjoin(KNOWLEDGE_DIR, 'adoption.jsonl');
+const KNOWLEDGE_REVIEW_SIGNAL_LOG = cjoin(KNOWLEDGE_DIR, 'review-signals.jsonl');
 const OPENPRD_HARNESS_TURN_STATE = cjoin('.openprd', 'harness', 'turn-state.json');
+const QUALITY_LATEST_REPORT = cjoin('.openprd', 'quality', 'reports', 'latest.json');
 const PENDING_KNOWLEDGE_CANDIDATE_STATUSES = new Set(['pending-review', 'pending']);
 const REVIEWED_KNOWLEDGE_CANDIDATE_STATUSES = new Set([
   'promoted',
@@ -58,7 +62,7 @@ function knowledgePath(projectRoot, relativePath) {
 
 function defaultKnowledgeIndex() {
   return {
-    version: 1,
+    version: 2,
     updatedAt: timestamp(),
     incidents: [],
     patterns: [],
@@ -75,8 +79,25 @@ function normalizeStringList(value) {
     .filter(Boolean);
 }
 
+function normalizeArray(value) {
+  return Array.isArray(value) ? value.filter((item) => item !== null && item !== undefined) : [];
+}
+
 function uniq(items) {
   return [...new Set(items.filter(Boolean))];
+}
+
+function defaultSkillAdoption() {
+  return {
+    hitCount: 0,
+    referencedCount: 0,
+    injectedCount: 0,
+    lastHitAt: null,
+    lastReferencedAt: null,
+    lastInjectedAt: null,
+    lastSource: null,
+    recentEvents: [],
+  };
 }
 
 function slugify(value, fallback = 'knowledge') {
@@ -110,10 +131,164 @@ function readJsonObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
 }
 
+function trimPreview(value, max = 220) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+}
+
+function normalizeSkillAdoption(value) {
+  const current = readJsonObject(value) ?? {};
+  const recentEvents = Array.isArray(current.recentEvents)
+    ? current.recentEvents
+      .map((event) => readJsonObject(event))
+      .filter(Boolean)
+      .slice(0, 12)
+    : [];
+  return {
+    ...defaultSkillAdoption(),
+    ...current,
+    hitCount: Number.isFinite(Number(current.hitCount)) ? Number(current.hitCount) : 0,
+    referencedCount: Number.isFinite(Number(current.referencedCount)) ? Number(current.referencedCount) : 0,
+    injectedCount: Number.isFinite(Number(current.injectedCount)) ? Number(current.injectedCount) : 0,
+    recentEvents,
+  };
+}
+
+function normalizeSkillIndexEntry(entry = {}) {
+  const skill = readJsonObject(entry) ?? {};
+  return {
+    ...skill,
+    skillName: firstString(skill.skillName, path.basename(path.dirname(String(skill.path ?? ''))), 'knowledge-skill') ?? 'knowledge-skill',
+    path: firstString(skill.path),
+    sourceKind: firstString(skill.sourceKind),
+    sourceRef: firstString(skill.sourceRef),
+    candidateId: firstString(skill.candidateId),
+    candidateIds: uniq([
+      ...normalizeStringList(skill.candidateIds),
+      ...normalizeStringList(skill.candidateId ? [skill.candidateId] : []),
+    ]),
+    categories: normalizeStringList(skill.categories),
+    triggerHints: normalizeStringList(skill.triggerHints),
+    touchedFiles: normalizeStringList(skill.touchedFiles),
+    evidencePaths: normalizeStringList(skill.evidencePaths),
+    rootCauseLabels: normalizeStringList(skill.rootCauseLabels),
+    description: firstString(skill.description),
+    summary: firstString(skill.summary),
+    adoption: normalizeSkillAdoption(skill.adoption),
+  };
+}
+
+function extractCandidateIds(skill = {}) {
+  return uniq([
+    ...normalizeStringList(skill.candidateIds),
+    ...normalizeStringList(skill.candidateId ? [skill.candidateId] : []),
+    ...String(skill.sourceRef ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => /^candidate-[a-z0-9-]+$/i.test(item)),
+  ]);
+}
+
+function normalizeSearchText(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[`"'()[\]{}:;,!?]/g, ' ')
+    .replace(/[_/\\.-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeSearchTokens(value) {
+  const text = normalizeSearchText(value);
+  const asciiTokens = text
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 3);
+  const hanTokens = String(value ?? '').match(/[\u4e00-\u9fa5]{2,}/g) ?? [];
+  return uniq([...asciiTokens, ...hanTokens]);
+}
+
+function sortByLength(items = []) {
+  return [...items].sort((left, right) => String(right).length - String(left).length);
+}
+
+function scoreQueryAgainstFields(queryText, queryTokens, fields = []) {
+  let score = 0;
+  const matchedOn = [];
+  for (const field of fields) {
+    const text = String(field ?? '').trim();
+    if (!text) continue;
+    const normalized = normalizeSearchText(text);
+    if (!normalized) continue;
+    let matched = false;
+    if (normalized.length >= 6 && queryText.includes(normalized)) {
+      matched = true;
+      score += normalized.length >= 18 ? 10 : 7;
+    } else {
+      const fieldTokens = normalizeSearchTokens(text);
+      const overlap = fieldTokens.filter((token) => queryTokens.includes(token));
+      if (overlap.length > 0) {
+        matched = true;
+        score += Math.min(overlap.length, 4) * 2;
+      }
+    }
+    if (matched) {
+      matchedOn.push(trimPreview(text, 120));
+    }
+  }
+  return {
+    score,
+    matchedOn: uniq(matchedOn).slice(0, 6),
+  };
+}
+
+function parseMarkdownSectionList(markdown, headings = []) {
+  if (!markdown) return [];
+  const lines = String(markdown).split(/\r?\n/);
+  const sectionSet = new Set(headings);
+  const collected = [];
+  let active = false;
+  for (const line of lines) {
+    const heading = line.match(/^##\s+(.+?)\s*$/);
+    if (heading) {
+      active = sectionSet.has(heading[1].trim());
+      continue;
+    }
+    if (!active) continue;
+    const bullet = line.match(/^\s*[-*]\s+(.+?)\s*$/);
+    if (bullet) {
+      collected.push(bullet[1].trim());
+    }
+  }
+  return uniq(collected);
+}
+
+function parseSkillMetadataFromText(markdown) {
+  const text = String(markdown ?? '');
+  const frontmatter = text.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
+  const descriptionLine = frontmatter?.[1]
+    ?.split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.startsWith('description:'));
+  const description = descriptionLine ? descriptionLine.replace(/^description:\s*/, '').trim() : null;
+  const triggerHints = parseMarkdownSectionList(text, ['触发场景', '常见误判', '先看什么', '收尾顺序', '反模式', '下次触发时先看什么']);
+  const rootCauseLabels = parseMarkdownSectionList(text, ['可复用模式']);
+  const evidencePaths = uniq((text.match(/`([^`]+)`/g) ?? [])
+    .map((entry) => entry.replace(/`/g, '').trim())
+    .filter((entry) => entry.includes('/') || entry.endsWith('.md') || entry.endsWith('.js') || entry.endsWith('.ts')));
+  return {
+    description,
+    triggerHints,
+    rootCauseLabels,
+    evidencePaths,
+  };
+}
+
 async function ensureKnowledgeWorkspace(projectRoot) {
   await fs.mkdir(knowledgePath(projectRoot, cjoin(KNOWLEDGE_DIR, 'incidents')), { recursive: true });
   await fs.mkdir(knowledgePath(projectRoot, cjoin(KNOWLEDGE_DIR, 'patterns')), { recursive: true });
-  await fs.mkdir(knowledgePath(projectRoot, cjoin(KNOWLEDGE_DIR, 'skills')), { recursive: true });
+  await fs.mkdir(knowledgePath(projectRoot, KNOWLEDGE_SKILLS_DIR), { recursive: true });
   await fs.mkdir(knowledgePath(projectRoot, KNOWLEDGE_CANDIDATES_DIR), { recursive: true });
   await fs.mkdir(knowledgePath(projectRoot, KNOWLEDGE_DRAFTS_DIR), { recursive: true });
   const indexPath = knowledgePath(projectRoot, KNOWLEDGE_INDEX);
@@ -142,6 +317,140 @@ async function writeKnowledgeIndex(projectRoot, index) {
     ...index,
     updatedAt: timestamp(),
   });
+}
+
+async function readCandidateSupportBundle(projectRoot, candidateId) {
+  const candidate = await readCandidateById(projectRoot, candidateId);
+  if (!candidate) {
+    return null;
+  }
+  const candidateDir = candidate.files?.candidateDir ?? knowledgePath(projectRoot, cjoin(KNOWLEDGE_CANDIDATES_DIR, candidateId));
+  const rootCauseCandidates = await readJson(path.join(candidateDir, 'root-cause-candidates.json')).catch(() => []);
+  return {
+    candidateId,
+    categories: normalizeStringList(candidate.categories),
+    touchedFiles: normalizeStringList(candidate.touchedFiles),
+    evidencePaths: uniq([
+      toRelativeProjectPath(projectRoot, candidate.files?.candidate),
+      ...normalizeStringList(candidate.touchedFiles),
+    ]),
+    rootCauseLabels: uniq(normalizeArray(rootCauseCandidates)
+      .map((item) => firstString(item?.title, item?.label, item?.name))
+      .filter(Boolean)),
+    triggerHints: uniq([
+      ...normalizeStringList(candidate.reasons),
+      ...normalizeStringList(candidate.reviewSignals?.map((signal) => signal.summary)),
+    ]),
+    summary: firstString(candidate.summary),
+  };
+}
+
+async function hydrateKnowledgeSkillEntry(projectRoot, entry, cache = new Map()) {
+  const current = normalizeSkillIndexEntry(entry);
+  const skillPath = current.path
+    ? (path.isAbsolute(current.path) ? path.resolve(current.path) : knowledgePath(projectRoot, current.path))
+    : null;
+  const markdown = skillPath ? await fs.readFile(skillPath, 'utf8').catch(() => '') : '';
+  const parsedSkill = parseSkillMetadataFromText(markdown);
+  const candidateIds = extractCandidateIds(current);
+  const candidateBundles = [];
+  for (const candidateId of candidateIds) {
+    const cacheKey = `candidate:${candidateId}`;
+    if (!cache.has(cacheKey)) {
+      cache.set(cacheKey, readCandidateSupportBundle(projectRoot, candidateId));
+    }
+    const bundle = await cache.get(cacheKey);
+    if (bundle) {
+      candidateBundles.push(bundle);
+    }
+  }
+  const next = {
+    ...current,
+    candidateId: current.candidateId ?? candidateIds[0] ?? null,
+    candidateIds,
+    categories: uniq([
+      ...current.categories,
+      ...candidateBundles.flatMap((bundle) => bundle.categories),
+    ]).slice(0, 24),
+    triggerHints: uniq([
+      ...current.triggerHints,
+      ...parsedSkill.triggerHints,
+      ...candidateBundles.flatMap((bundle) => bundle.triggerHints),
+    ]).slice(0, 24),
+    touchedFiles: uniq([
+      ...current.touchedFiles,
+      ...candidateBundles.flatMap((bundle) => bundle.touchedFiles),
+    ]).slice(0, 24),
+    evidencePaths: uniq([
+      ...current.evidencePaths,
+      ...parsedSkill.evidencePaths,
+      ...candidateBundles.flatMap((bundle) => bundle.evidencePaths),
+    ]).slice(0, 24),
+    rootCauseLabels: uniq([
+      ...current.rootCauseLabels,
+      ...parsedSkill.rootCauseLabels,
+      ...candidateBundles.flatMap((bundle) => bundle.rootCauseLabels),
+    ]).slice(0, 24),
+    description: current.description ?? parsedSkill.description,
+    summary: current.summary ?? candidateBundles.map((bundle) => bundle.summary).find(Boolean) ?? null,
+    adoption: normalizeSkillAdoption(current.adoption),
+  };
+  return next;
+}
+
+function serializeComparable(value) {
+  return JSON.stringify(value);
+}
+
+async function hydrateKnowledgeSkills(projectRoot) {
+  const index = await readKnowledgeIndex(projectRoot);
+  const cache = new Map();
+  const hydratedSkills = [];
+  let changed = false;
+  for (const skill of index.skills.map((entry) => normalizeSkillIndexEntry(entry))) {
+    const hydrated = await hydrateKnowledgeSkillEntry(projectRoot, skill, cache);
+    hydratedSkills.push(hydrated);
+    if (serializeComparable(hydrated) !== serializeComparable(skill)) {
+      changed = true;
+    }
+  }
+  if (changed) {
+    await writeKnowledgeIndex(projectRoot, {
+      ...index,
+      skills: hydratedSkills,
+    });
+  }
+  return {
+    index: changed ? { ...index, skills: hydratedSkills } : index,
+    skills: hydratedSkills,
+  };
+}
+
+function buildKnowledgeAdoptionSummary(skills = []) {
+  const totals = {
+    hit: 0,
+    referenced: 0,
+    injected: 0,
+  };
+  const activeSkills = {
+    hit: 0,
+    referenced: 0,
+    injected: 0,
+  };
+  for (const skill of skills.map((entry) => normalizeSkillIndexEntry(entry))) {
+    const adoption = normalizeSkillAdoption(skill.adoption);
+    totals.hit += adoption.hitCount;
+    totals.referenced += adoption.referencedCount;
+    totals.injected += adoption.injectedCount;
+    if (adoption.hitCount > 0) activeSkills.hit += 1;
+    if (adoption.referencedCount > 0) activeSkills.referenced += 1;
+    if (adoption.injectedCount > 0) activeSkills.injected += 1;
+  }
+  return {
+    totals,
+    activeSkills,
+    totalSkills: skills.length,
+  };
 }
 
 function upsertBy(items, key, value, max = 200) {
@@ -220,6 +529,16 @@ function normalizeTouchedFiles(projectRoot, value) {
   return uniq(normalizeStringList(value).map((file) => toRelativeProjectPath(projectRoot, file))).filter(Boolean);
 }
 
+async function readRecentKnowledgeReviewSignals(projectRoot, options = {}) {
+  const limit = Math.max(1, Number(options.limit ?? 24));
+  const entries = await readJsonl(knowledgePath(projectRoot, KNOWLEDGE_REVIEW_SIGNAL_LOG)).catch(() => []);
+  return entries
+    .map((signal) => normalizeReviewSignal(projectRoot, signal))
+    .filter((signal) => signal.summary || signal.touchedFiles.length > 0 || signal.kind)
+    .slice(-limit)
+    .reverse();
+}
+
 function hasOverlap(left = [], right = []) {
   const rightSet = new Set(right);
   return left.some((item) => rightSet.has(item));
@@ -229,10 +548,16 @@ function buildReviewContext(projectRoot, raw = {}, options = {}) {
   const rawTouchedFiles = normalizeTouchedFiles(projectRoot, raw.touchedFiles);
   const optionTouchedFiles = normalizeTouchedFiles(projectRoot, options.touchedFiles);
   const optionSignal = options.signal ? normalizeReviewSignal(projectRoot, options.signal) : null;
+  const recentSignals = Array.isArray(options.recentSignals)
+    ? options.recentSignals.map((signal) => normalizeReviewSignal(projectRoot, signal))
+    : [];
   const embeddedSignals = Array.isArray(raw.reviewSignals)
     ? raw.reviewSignals.map((signal) => normalizeReviewSignal(projectRoot, signal))
     : [];
-  const latestSignalTouchedFiles = embeddedSignals.find((signal) => signal.touchedFiles.length > 0)?.touchedFiles ?? [];
+  const latestSignalTouchedFiles = [
+    ...(embeddedSignals.find((signal) => signal.touchedFiles.length > 0)?.touchedFiles ?? []),
+    ...(recentSignals.find((signal) => signal.touchedFiles.length > 0)?.touchedFiles ?? []),
+  ];
   const touchedFiles = optionTouchedFiles.length > 0
     ? optionTouchedFiles
     : (optionSignal?.touchedFiles?.length ? optionSignal.touchedFiles : (latestSignalTouchedFiles.length > 0 ? latestSignalTouchedFiles : rawTouchedFiles));
@@ -240,7 +565,7 @@ function buildReviewContext(projectRoot, raw = {}, options = {}) {
   if (optionSignal) {
     signalEntries.push(optionSignal);
   }
-  for (const signal of embeddedSignals) {
+  for (const signal of [...embeddedSignals, ...recentSignals]) {
     const isSameSignal = optionSignal && signal.id === optionSignal.id && signal.kind === optionSignal.kind;
     if (isSameSignal) continue;
     if (!optionSignal) {
@@ -292,6 +617,81 @@ function buildKnowledgeCategories({ source, touchedFiles, reviewSignals }) {
     categories.push('high-impact-fix');
   }
   return uniq(categories);
+}
+
+function applicabilityFromTouchedFiles(touchedFiles = []) {
+  const normalized = touchedFiles.map((file) => String(file).split(path.sep).join('/'));
+  const hints = [];
+  if (normalized.some((file) => file.startsWith('src/') || file.startsWith('app/') || file.startsWith('lib/'))) {
+    hints.push('适用于项目源码或核心流程已经落地、需要把实现经验固化为项目知识的任务。');
+  }
+  if (normalized.some((file) => file.startsWith('test/') || file.startsWith('tests/'))) {
+    hints.push('适用于本轮补过验证或测试夹具，后续同类需求需要同步复用验证方式的任务。');
+  }
+  if (normalized.some((file) => file.startsWith('docs/basic/'))) {
+    hints.push('适用于这轮改动同时影响 docs/basic、CLI 契约或实现说明，需要把文档同步经验一起沉淀的任务。');
+  }
+  if (normalized.some((file) => /(hook|harness|agent|skill|quality|run-harness|growth|loop)/i.test(file))) {
+    hints.push('特别适用于 Agent、hook、harness、quality 或 growth 工作流改动，避免下次再次靠聊天上下文兜底。');
+  }
+  if (hints.length === 0 && normalized.length > 0) {
+    hints.push(`适用于再次改动 ${normalized.slice(0, 4).join('、')} 这类相关文件时，优先复用本轮模式。`);
+  }
+  return hints;
+}
+
+function summarizeReviewSignalKinds(reviewSignals = []) {
+  return uniq(reviewSignals.map((signal) => signal.kind).filter(Boolean)).slice(0, 6);
+}
+
+function buildKnowledgeAbstraction({
+  candidate,
+  source,
+  touchedFiles,
+  reviewSignals,
+  relativeCandidateDir,
+  relativeDraftSkillPath,
+}) {
+  const triggerConditions = uniq([
+    ...candidate.reasons,
+    ...normalizeStringList(source.triggers),
+    ...source.symptoms.map((item) => `症状: ${item}`),
+    ...reviewSignals.map((signal) => {
+      const summary = signalSummary(signal);
+      return summary ? `${signal.kind}: ${summary}` : signal.kind;
+    }),
+  ]).slice(0, 8);
+  const applicability = uniq([
+    source.abstractPattern ? `抽象模式: ${source.abstractPattern}` : null,
+    ...applicabilityFromTouchedFiles(touchedFiles),
+  ]).slice(0, 6);
+  const verificationSteps = uniq([
+    ...reviewSignals.map((signal) => signal.summary).filter(Boolean),
+    ...source.verificationSteps,
+  ]).slice(0, 8);
+  const typicalInputs = uniq([
+    firstString(source.title, candidate.title) ? `任务摘要: ${firstString(source.title, candidate.title)}` : null,
+    touchedFiles.length > 0 ? `相关文件: ${touchedFiles.slice(0, 6).join('、')}` : null,
+    source.evidenceSources.length > 0
+      ? `已有证据: ${source.evidenceSources.slice(0, 4).map((item) => `${item.kind}:${item.path}`).join('；')}`
+      : null,
+    reviewSignals.length > 0
+      ? `验证信号: ${summarizeReviewSignalKinds(reviewSignals).join('、')}`
+      : null,
+  ]).slice(0, 6);
+  const typicalOutputs = uniq([
+    relativeCandidateDir ? `knowledge candidate: ${relativeCandidateDir}/candidate.json` : null,
+    relativeCandidateDir ? `诊断报告: ${relativeCandidateDir}/diagnostic-report.json` : null,
+    relativeDraftSkillPath ? `draft skill: ${relativeDraftSkillPath}` : null,
+    verificationSteps[0] ? `验证结论: ${verificationSteps[0]}` : null,
+  ]).slice(0, 6);
+  return {
+    triggerConditions,
+    applicability,
+    verificationSteps,
+    typicalInputs,
+    typicalOutputs,
+  };
 }
 
 function categoryReason(category) {
@@ -346,6 +746,144 @@ async function loadRawReviewInput(projectRoot, from) {
   return { sourcePath: resolved, raw: readJsonObject(parsed) };
 }
 
+function shouldIgnoreInferredTouchedPath(relativePath) {
+  const normalized = String(relativePath ?? '').split(path.sep).join('/');
+  return [
+    '.git/',
+    'node_modules/',
+    '.openprd/',
+    'dist/',
+    'build/',
+    'coverage/',
+    'test-results/',
+    '.next/',
+    '.turbo/',
+  ].some((prefix) => normalized.startsWith(prefix));
+}
+
+function looksLikeInferredTouchedFile(relativePath) {
+  const normalized = String(relativePath ?? '').split(path.sep).join('/');
+  if (!normalized || shouldIgnoreInferredTouchedPath(normalized)) {
+    return false;
+  }
+  if (normalized === 'AGENTS.md' || /^docs\/basic\//.test(normalized) || /^skills\/.+\/SKILL\.md$/.test(normalized)) {
+    return true;
+  }
+  if (/^(src|app|lib|server|scripts|test|tests|templates)\//.test(normalized)) {
+    return true;
+  }
+  return CODE_EXTENSIONS.has(path.extname(normalized).toLowerCase());
+}
+
+async function inferRecentTouchedFiles(projectRoot, options = {}) {
+  const limit = Math.max(1, Number(options.limit ?? 8));
+  const lookbackMs = Math.max(1, Number(options.lookbackMs ?? (4 * 60 * 60 * 1000)));
+  const nowValue = Date.now();
+  const collected = [];
+  async function walk(dir) {
+    const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      const relativePath = path.relative(projectRoot, fullPath).split(path.sep).join('/');
+      if (entry.isDirectory()) {
+        if (shouldIgnoreInferredTouchedPath(`${relativePath}/`)) {
+          continue;
+        }
+        await walk(fullPath);
+        continue;
+      }
+      if (!entry.isFile() || !looksLikeInferredTouchedFile(relativePath)) {
+        continue;
+      }
+      const stat = await fs.stat(fullPath).catch(() => null);
+      if (!stat) continue;
+      collected.push({
+        path: relativePath,
+        mtimeMs: Number(stat.mtimeMs ?? 0),
+      });
+    }
+  }
+  await walk(projectRoot);
+  const sorted = collected.sort((left, right) => right.mtimeMs - left.mtimeMs || left.path.localeCompare(right.path));
+  const recent = sorted.filter((file) => nowValue - file.mtimeMs <= lookbackMs);
+  const selected = (recent.length > 0 ? recent : sorted).slice(0, limit).map((file) => file.path);
+  return uniq(selected);
+}
+
+function buildSyntheticReviewSource(projectRoot, options = {}) {
+  const currentSignal = options.signal ? normalizeReviewSignal(projectRoot, options.signal) : null;
+  const recentSignals = Array.isArray(options.recentSignals)
+    ? options.recentSignals.map((signal) => normalizeReviewSignal(projectRoot, signal))
+    : [];
+  const touchedFiles = uniq([
+    ...normalizeTouchedFiles(projectRoot, options.touchedFiles),
+    ...(currentSignal?.touchedFiles ?? []),
+    ...recentSignals.flatMap((signal) => signal.touchedFiles),
+  ]).slice(0, 8);
+  const summaries = uniq([
+    currentSignal?.summary,
+    ...recentSignals.map((signal) => signal.summary),
+  ]).filter(Boolean).slice(0, 6);
+  const signalKinds = uniq([
+    currentSignal?.kind,
+    ...recentSignals.map((signal) => signal.kind),
+  ]).filter(Boolean).slice(0, 6);
+  const attentionGates = uniq([
+    ...(currentSignal?.attentionGates ?? []),
+    ...recentSignals.flatMap((signal) => signal.attentionGates ?? []),
+  ]);
+  const title = firstString(
+    options.title,
+    summaries[0],
+    touchedFiles[0] ? `完成态回顾 ${path.basename(touchedFiles[0])}` : null,
+    '已完成任务回顾',
+  ) ?? '已完成任务回顾';
+  return {
+    kind: 'completion-review',
+    sourceId: slugify(firstString(options.sourceId, title), 'completion-review'),
+    sourcePath: firstString(options.sourcePath, KNOWLEDGE_REVIEW_SIGNAL_LOG),
+    primaryPath: firstString(options.sourcePath, KNOWLEDGE_REVIEW_SIGNAL_LOG),
+    sourcePaths: [firstString(options.sourcePath, KNOWLEDGE_REVIEW_SIGNAL_LOG)].filter(Boolean),
+    title,
+    status: currentSignal?.ok === false || currentSignal?.productionReady === false ? 'needs-attention' : 'pass',
+    symptoms: summaries,
+    attentionGates,
+    correlationFields: [],
+    extraContextFields: [],
+    missingCorrelationFields: [],
+    eventNames: signalKinds,
+    rootCauseCandidates: touchedFiles.slice(0, 4).map((file) => ({
+      title: `复用 ${file} 中已经验证过的实现与回归模式`,
+      nextSteps: ['按本轮验证链路补齐最小证据，再决定是否 promote 为项目级 skill。'],
+    })),
+    evidenceSources: [
+      ...touchedFiles.slice(0, 6).map((file) => ({ kind: 'touched-file', path: file })),
+      ...signalKinds.slice(0, 4).map((kind) => ({ kind: 'review-signal', path: kind })),
+    ],
+    queryExamples: [
+      touchedFiles.length > 0 ? `先复看本轮改动文件：${touchedFiles.slice(0, 4).join('、')}。` : null,
+      signalKinds.length > 0 ? `对齐本轮验证信号：${signalKinds.join('、')}。` : null,
+      '把本轮触发条件、适用范围、验证步骤和典型输入输出抽成 candidate，避免只留在当前对话里。',
+    ].filter(Boolean),
+    abstractPattern: '当一轮实现已经达到可交付状态时，即使没有 turn-state，也要从最近验证信号和最近改动文件中自动抽出可复用的项目经验。',
+    triggers: uniq([
+      ...summaries,
+      ...signalKinds.map((kind) => `完成信号: ${kind}`),
+      ...touchedFiles.map((file) => `相关文件: ${file}`),
+    ]).slice(0, 8),
+    prevention: [
+      '任务完成后自动生成 knowledge candidate，再由维护者决定 promote、reject 或 archive。',
+      '即使没有 hook turn-state，也要回退到最近验证信号和最近改动文件完成后置沉淀。',
+      '保持验证证据、实现文件和知识草案之间的最小关联，减少下次复盘时重新拼上下文的成本。',
+    ],
+    verificationSteps: [
+      ...summaries,
+      '确认自动抽象出来的触发条件、适用范围、典型输入输出和验证步骤与本轮交付一致。',
+      '再次执行当前主验证命令，确认输出与知识草案描述没有偏差。',
+    ].filter(Boolean),
+  };
+}
+
 function renderList(items, fallback) {
   const list = items.filter(Boolean);
   if (list.length === 0) {
@@ -355,21 +893,10 @@ function renderList(items, fallback) {
 }
 
 function renderKnowledgeDraftSkill({ skillName, candidate, source, relativeCandidateDir }) {
-  const triggerItems = uniq([
-    ...candidate.reasons,
-    ...source.symptoms.map((item) => `症状: ${item}`),
-    ...candidate.reviewSignals.map((signal) => {
-      const summary = signalSummary(signal);
-      return summary ? `${signal.kind}: ${summary}` : signal.kind;
-    }),
-  ]);
+  const abstraction = readJsonObject(candidate.abstraction) ?? {};
   const inspectItems = uniq([
     ...candidate.touchedFiles.map((file) => `\`${file}\``),
     ...source.evidenceSources.map((item) => `\`${item.path}\``),
-  ]);
-  const verificationItems = uniq([
-    ...candidate.reviewSignals.map((signal) => signal.summary).filter(Boolean),
-    ...source.verificationSteps,
   ]);
   return `---
 name: ${skillName}
@@ -382,9 +909,21 @@ description: OpenPrd 在本轮回顾时自动生成的待确认项目经验草�
 > 候选目录：\`${relativeCandidateDir}\`
 > Promote：\`openprd quality . --learn --from ${relativeCandidateDir}\`
 
-## 为什么值得沉淀
+## 触发条件
 
-${renderList(triggerItems, '本轮实现已经出现值得复用的排查或修复模式。')}
+${renderList(abstraction.triggerConditions ?? [], '本轮实现已经出现值得复用的排查或修复模式。')}
+
+## 适用范围
+
+${renderList(abstraction.applicability ?? [], '当同类任务再次出现时，优先复用本轮已经验证过的实现与回归模式。')}
+
+## 典型输入
+
+${renderList(abstraction.typicalInputs ?? [], '至少带上当前任务摘要、相关文件和现有验证证据。')}
+
+## 典型输出
+
+${renderList(abstraction.typicalOutputs ?? [], '至少产出 knowledge candidate、诊断报告和可复用验证结论。')}
 
 ## 下次触发时先看什么
 
@@ -396,11 +935,11 @@ ${renderList(source.rootCauseCandidates.map((candidateItem) => candidateItem.tit
 
 ## 验证方式
 
-${renderList(verificationItems, '修复后重新走一遍本轮验证链路，确认问题不再复现。')}
+${renderList(abstraction.verificationSteps ?? [], '修复后重新走一遍本轮验证链路，确认问题不再复现。')}
 `;
 }
 
-function buildCandidateDiagnosticReport({ candidateId, title, summary, source, touchedFiles, reviewSignals }) {
+function buildCandidateDiagnosticReport({ candidateId, title, summary, source, touchedFiles, reviewSignals, abstraction }) {
   return {
     id: candidateId,
     knowledgeCandidateId: candidateId,
@@ -415,6 +954,7 @@ function buildCandidateDiagnosticReport({ candidateId, title, summary, source, t
     message: summary,
     touchedFiles,
     reviewSignals,
+    abstraction,
     runtimeEvents: reviewSignals.map((signal) => ({
       eventName: signal.kind,
       status: signal.ok === false || signal.productionReady === false ? 'needs-attention' : 'pass',
@@ -455,8 +995,10 @@ function buildKnowledgeCandidateMeta({
   categories,
   reasons,
   touchedFiles,
+  touchedFileSource,
   reviewSignals,
   existingCandidate,
+  abstraction,
 }) {
   return {
     version: 1,
@@ -471,7 +1013,9 @@ function buildKnowledgeCandidateMeta({
     categories,
     reasons,
     touchedFiles,
+    touchedFileSource,
     reviewSignals,
+    abstraction,
     files: {
       candidate: candidatePath,
       candidateDir,
@@ -483,6 +1027,8 @@ function buildKnowledgeCandidateMeta({
 
 export async function recordKnowledgeReviewSignal(projectRoot, signal = {}) {
   const statePath = knowledgePath(projectRoot, OPENPRD_HARNESS_TURN_STATE);
+  const normalized = normalizeReviewSignal(projectRoot, signal);
+  await appendJsonl(knowledgePath(projectRoot, KNOWLEDGE_REVIEW_SIGNAL_LOG), normalized).catch(() => null);
   if (!(await exists(statePath))) {
     return { ok: true, recorded: false, reason: 'turn-state-missing', turnStatePath: statePath };
   }
@@ -491,7 +1037,6 @@ export async function recordKnowledgeReviewSignal(projectRoot, signal = {}) {
   if (!current) {
     return { ok: true, recorded: false, reason: 'turn-state-invalid', turnStatePath: statePath };
   }
-  const normalized = normalizeReviewSignal(projectRoot, signal);
   const existingSignals = Array.isArray(current.reviewSignals) ? current.reviewSignals : [];
   const reviewSignals = [normalized, ...existingSignals.filter((item) => item?.id !== normalized.id)].slice(0, 24);
   const touchedFiles = uniq([
@@ -533,23 +1078,29 @@ export async function recordKnowledgeReviewSignal(projectRoot, signal = {}) {
 
 export async function reviewKnowledgeWorkspace(projectRoot, options = {}) {
   await ensureKnowledgeWorkspace(projectRoot);
-  const from = options.from ?? ((await exists(knowledgePath(projectRoot, OPENPRD_HARNESS_TURN_STATE))) ? OPENPRD_HARNESS_TURN_STATE : null);
-  if (!from) {
-    return {
-      ok: true,
-      action: 'quality-knowledge-review',
-      skipped: true,
-      reason: 'no-review-source',
-    };
-  }
-
-  const rawInput = await loadRawReviewInput(projectRoot, from);
-  const resolved = await resolveQualityLearningSource(projectRoot, {
-    from,
-    latestReportPath: options.latestReportPath ?? null,
-    requiredCorrelationFields: Array.isArray(options.requiredCorrelationFields) ? options.requiredCorrelationFields : [],
-  });
-  if (!resolved.ok) {
+  const recentSignals = await readRecentKnowledgeReviewSignals(projectRoot, { limit: 24 });
+  const latestQuality = await readJson(knowledgePath(projectRoot, QUALITY_LATEST_REPORT)).catch(() => null);
+  const latestReportPath = firstString(options.latestReportPath, latestQuality?.jsonPath, latestQuality?.reportPath);
+  const turnStateSource = (await exists(knowledgePath(projectRoot, OPENPRD_HARNESS_TURN_STATE))) ? OPENPRD_HARNESS_TURN_STATE : null;
+  const from = firstString(options.from, turnStateSource, latestReportPath);
+  const rawInput = from ? await loadRawReviewInput(projectRoot, from) : { sourcePath: null, raw: null };
+  const resolved = from
+    ? await resolveQualityLearningSource(projectRoot, {
+      from,
+      latestReportPath,
+      requiredCorrelationFields: Array.isArray(options.requiredCorrelationFields) ? options.requiredCorrelationFields : [],
+    })
+    : { ok: false, error: 'no-review-source' };
+  const source = resolved.ok
+    ? resolved.source
+    : buildSyntheticReviewSource(projectRoot, {
+      signal: options.signal,
+      recentSignals,
+      touchedFiles: options.touchedFiles,
+      sourcePath: rawInput.sourcePath ?? latestReportPath ?? KNOWLEDGE_REVIEW_SIGNAL_LOG,
+      title: firstString(options.title, readJsonObject(rawInput.raw)?.title),
+    });
+  if (!resolved.ok && source.evidenceSources.length === 0 && source.rootCauseCandidates.length === 0) {
     return {
       ok: true,
       action: 'quality-knowledge-review',
@@ -557,11 +1108,28 @@ export async function reviewKnowledgeWorkspace(projectRoot, options = {}) {
       reason: resolved.error,
     };
   }
-
-  const source = resolved.source;
   const raw = readJsonObject(rawInput.raw) ?? {};
-  const reviewContext = buildReviewContext(projectRoot, raw, options);
-  const touchedFiles = reviewContext.touchedFiles;
+  const explicitTouchedFiles = normalizeTouchedFiles(projectRoot, options.touchedFiles);
+  const optionSignal = options.signal ? normalizeReviewSignal(projectRoot, options.signal) : null;
+  const rawTouchedFiles = normalizeTouchedFiles(projectRoot, raw.touchedFiles);
+  const reviewContext = buildReviewContext(projectRoot, raw, {
+    ...options,
+    recentSignals,
+  });
+  let touchedFiles = reviewContext.touchedFiles;
+  let touchedFileSource = explicitTouchedFiles.length > 0
+    ? 'explicit'
+    : optionSignal?.touchedFiles?.length
+      ? 'signal'
+      : rawTouchedFiles.length > 0
+        ? 'review-source'
+        : (recentSignals.some((signal) => signal.touchedFiles.length > 0) ? 'recent-signals' : null);
+  if (touchedFiles.length === 0) {
+    touchedFiles = await inferRecentTouchedFiles(projectRoot, { limit: 8 });
+    if (touchedFiles.length > 0) {
+      touchedFileSource = 'inferred-recent-files';
+    }
+  }
   const substantiveTouchedFiles = touchedFiles.filter(isSubstantiveTouchedFile);
   const reviewSignals = reviewContext.reviewSignals;
   const categories = buildKnowledgeCategories({ source, touchedFiles: substantiveTouchedFiles, reviewSignals });
@@ -569,6 +1137,7 @@ export async function reviewKnowledgeWorkspace(projectRoot, options = {}) {
   const hasStrongSignal = categories.length > 0
     || source.rootCauseCandidates.length > 0
     || source.symptoms.length > 1
+    || source.kind === 'completion-review'
     || reviewSignals.some((signal) => signal.ok === true || signal.productionReady === true);
 
   if (substantiveTouchedFiles.length === 0 || !hasStrongSignal) {
@@ -596,12 +1165,15 @@ export async function reviewKnowledgeWorkspace(projectRoot, options = {}) {
   const timelinePath = path.join(candidateDir, 'timeline.json');
   const draftSkillPath = knowledgePath(projectRoot, cjoin(KNOWLEDGE_DRAFTS_DIR, names.skillName, 'SKILL.md'));
   const existingCandidate = await readJson(candidatePath).catch(() => null);
+  const relativeCandidateDir = path.relative(projectRoot, candidateDir).split(path.sep).join('/');
+  const relativeDraftSkillPath = path.relative(projectRoot, draftSkillPath).split(path.sep).join('/');
   const reviewSummary = [
     `本轮围绕 ${substantiveTouchedFiles.length} 个可沉淀文件生成回顾。`,
     reasons[0] ?? '这次实现已经具备项目级经验抽象价值。',
     reviewSignals.length > 0 ? `已记录 ${reviewSignals.length} 条回顾信号。` : null,
+    touchedFileSource === 'inferred-recent-files' ? '本轮 touched files 来自最近修改文件推断。' : null,
   ].filter(Boolean).join(' ');
-  const candidate = buildKnowledgeCandidateMeta({
+  const draftCandidate = buildKnowledgeCandidateMeta({
     projectRoot,
     candidateId,
     candidatePath,
@@ -613,10 +1185,23 @@ export async function reviewKnowledgeWorkspace(projectRoot, options = {}) {
     categories,
     reasons,
     touchedFiles: substantiveTouchedFiles,
+    touchedFileSource,
     reviewSignals,
     existingCandidate: readJsonObject(existingCandidate) ?? null,
+    abstraction: null,
   });
-  const relativeCandidateDir = path.relative(projectRoot, candidateDir).split(path.sep).join('/');
+  const abstraction = buildKnowledgeAbstraction({
+    candidate: draftCandidate,
+    source,
+    touchedFiles: substantiveTouchedFiles,
+    reviewSignals,
+    relativeCandidateDir,
+    relativeDraftSkillPath,
+  });
+  const candidate = {
+    ...draftCandidate,
+    abstraction,
+  };
   await writeJson(candidatePath, candidate);
   await writeJson(diagnosticReportPath, buildCandidateDiagnosticReport({
     candidateId,
@@ -625,6 +1210,7 @@ export async function reviewKnowledgeWorkspace(projectRoot, options = {}) {
     source,
     touchedFiles: substantiveTouchedFiles,
     reviewSignals,
+    abstraction,
   }));
   await writeJson(rootCausePath, source.rootCauseCandidates.length > 0 ? source.rootCauseCandidates : substantiveTouchedFiles.map((file) => ({ title: `Inspect ${file}` })));
   await writeJson(timelinePath, reviewSignals.map((signal) => ({
@@ -794,6 +1380,193 @@ function buildCandidateCounts(candidates) {
     counts[candidate.statusGroup] = (counts[candidate.statusGroup] ?? 0) + 1;
   }
   return counts;
+}
+
+function buildKnowledgeMatchQuery(options = {}) {
+  const candidateFields = [
+    options.message,
+    options.prompt,
+    options.promptPreview,
+    options.recommendationTitle,
+    options.recommendationReason,
+    options.activeChange,
+    options.nextTaskTitle,
+    ...(normalizeStringList(options.relatedFiles)),
+  ].filter(Boolean);
+  const text = candidateFields.join('\n');
+  return {
+    text,
+    normalizedText: normalizeSearchText(text),
+    tokens: normalizeSearchTokens(text),
+  };
+}
+
+function scoreKnowledgeSkillMatch(skill, query) {
+  const fileHints = uniq([
+    ...skill.touchedFiles,
+    ...skill.touchedFiles.map((file) => path.basename(file)),
+    ...skill.evidencePaths,
+    ...skill.evidencePaths.map((file) => path.basename(file)),
+  ]);
+  const fields = [
+    skill.skillName,
+    skill.description,
+    skill.summary,
+    ...skill.categories,
+    ...skill.triggerHints,
+    ...skill.rootCauseLabels,
+    ...fileHints,
+  ];
+  const result = scoreQueryAgainstFields(query.normalizedText, query.tokens, fields);
+  return {
+    score: result.score,
+    matchedOn: result.matchedOn,
+    matchSummary: result.matchedOn.length > 0
+      ? `命中 ${result.matchedOn.slice(0, 3).join(' / ')}`
+      : '根据当前上下文自动命中',
+  };
+}
+
+export async function resolveKnowledgeSkillMatches(projectRoot, options = {}) {
+  await ensureKnowledgeWorkspace(projectRoot);
+  const { skills } = await hydrateKnowledgeSkills(projectRoot);
+  const query = buildKnowledgeMatchQuery(options);
+  if (!query.normalizedText) {
+    return {
+      ok: true,
+      action: 'knowledge-match',
+      projectRoot,
+      query: '',
+      matched: [],
+      summary: {
+        matched: 0,
+      },
+    };
+  }
+  const matches = skills
+    .map((skill) => {
+      const match = scoreKnowledgeSkillMatch(skill, query);
+      return match.score > 0
+        ? {
+            ...skill,
+            score: match.score,
+            matchedOn: match.matchedOn,
+            matchSummary: match.matchSummary,
+          }
+        : null;
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.score - left.score || left.skillName.localeCompare(right.skillName))
+    .slice(0, Math.max(1, Number(options.limit ?? 3)));
+  return {
+    ok: true,
+    action: 'knowledge-match',
+    projectRoot,
+    query: trimPreview(query.text, 320),
+    matched: matches,
+    summary: {
+      matched: matches.length,
+    },
+  };
+}
+
+function adoptionStageField(stage) {
+  if (stage === 'referenced') {
+    return { count: 'referencedCount', at: 'lastReferencedAt' };
+  }
+  if (stage === 'injected') {
+    return { count: 'injectedCount', at: 'lastInjectedAt' };
+  }
+  return { count: 'hitCount', at: 'lastHitAt' };
+}
+
+export async function recordKnowledgeSkillAdoption(projectRoot, options = {}) {
+  const requestedStages = uniq(normalizeStringList(options.stages ?? [options.stage]))
+    .filter((stage) => ['hit', 'referenced', 'injected'].includes(stage));
+  if (requestedStages.length === 0) {
+    return {
+      ok: true,
+      action: 'knowledge-adoption',
+      projectRoot,
+      updated: 0,
+      stages: [],
+      summary: buildKnowledgeAdoptionSummary([]),
+    };
+  }
+  const matchedSkills = normalizeArray(options.matches)
+    .map((skill) => normalizeSkillIndexEntry(skill))
+    .filter((skill) => skill.skillName);
+  if (matchedSkills.length === 0) {
+    const { skills } = await hydrateKnowledgeSkills(projectRoot);
+    return {
+      ok: true,
+      action: 'knowledge-adoption',
+      projectRoot,
+      updated: 0,
+      stages: requestedStages,
+      summary: buildKnowledgeAdoptionSummary(skills),
+    };
+  }
+
+  const { index, skills } = await hydrateKnowledgeSkills(projectRoot);
+  const nowValue = timestamp();
+  const skillNameSet = new Set(matchedSkills.map((skill) => skill.skillName));
+  const nextSkills = [];
+  let updated = 0;
+  for (const skill of skills) {
+    if (!skillNameSet.has(skill.skillName)) {
+      nextSkills.push(skill);
+      continue;
+    }
+    const match = matchedSkills.find((item) => item.skillName === skill.skillName) ?? skill;
+    const adoption = normalizeSkillAdoption(skill.adoption);
+    for (const stage of requestedStages) {
+      const field = adoptionStageField(stage);
+      adoption[field.count] += 1;
+      adoption[field.at] = nowValue;
+      adoption.lastSource = firstString(options.source, adoption.lastSource);
+      adoption.recentEvents = [
+        {
+          at: nowValue,
+          stage,
+          source: firstString(options.source),
+          sessionId: firstString(options.sessionId),
+          promptPreview: trimPreview(options.promptPreview),
+          matchSummary: firstString(match.matchSummary),
+          matchedOn: normalizeStringList(match.matchedOn).slice(0, 4),
+        },
+        ...adoption.recentEvents,
+      ].slice(0, 12);
+      await appendJsonl(knowledgePath(projectRoot, KNOWLEDGE_ADOPTION_LOG), {
+        version: 1,
+        at: nowValue,
+        stage,
+        skillName: skill.skillName,
+        source: firstString(options.source),
+        sessionId: firstString(options.sessionId),
+        promptPreview: trimPreview(options.promptPreview),
+        matchSummary: firstString(match.matchSummary),
+        matchedOn: normalizeStringList(match.matchedOn).slice(0, 6),
+      });
+    }
+    nextSkills.push({
+      ...skill,
+      adoption,
+    });
+    updated += 1;
+  }
+  await writeKnowledgeIndex(projectRoot, {
+    ...index,
+    skills: nextSkills,
+  });
+  return {
+    ok: true,
+    action: 'knowledge-adoption',
+    projectRoot,
+    updated,
+    stages: requestedStages,
+    summary: buildKnowledgeAdoptionSummary(nextSkills),
+  };
 }
 
 export async function listKnowledgeCandidates(projectRoot, options = {}) {
@@ -985,9 +1758,12 @@ export {
   ensureKnowledgeWorkspace,
   isPendingKnowledgeCandidateStatus,
   isReviewedKnowledgeCandidateStatus,
+  KNOWLEDGE_ADOPTION_LOG,
   KNOWLEDGE_CANDIDATES_DIR,
   KNOWLEDGE_DRAFTS_DIR,
   KNOWLEDGE_INDEX,
+  KNOWLEDGE_SKILLS_DIR,
   normalizeCandidateStatus,
   OPENPRD_HARNESS_TURN_STATE,
-};
+  buildKnowledgeAdoptionSummary,
+  };

@@ -19,33 +19,33 @@
  */
 import { labelExecutionMode } from '../execution-strategy.js';
 import { printCodexRuntimeResult } from './doctor-print.js';
-import { printKnowledgeReview } from './shared-print.js';
+import { printKnowledgeReview, printKnowledgeSkillMatches } from './shared-print.js';
 
 function printExecutionConfirmationChecklist(checklist) {
   if (!checklist?.required) {
     return;
   }
-  console.log(`${checklist.title ?? '执行确认清单'}:`);
+  console.log(`${checklist.title ?? '开始动手前先确认这些'}:`);
   if (checklist.objective) {
-    console.log(`- 本轮目标: ${checklist.objective}`);
+    console.log(`- 这次要做什么: ${checklist.objective}`);
   }
   if (checklist.scope?.length > 0) {
-    console.log(`- 执行范围: ${checklist.scope.join('；')}`);
+    console.log(`- 这次范围: ${checklist.scope.join('；')}`);
   }
   if (checklist.implementationItems?.length > 0) {
-    console.log(`- 将执行: ${checklist.implementationItems.join('；')}`);
+    console.log(`- 我会这样推进: ${checklist.implementationItems.join('；')}`);
   }
   if (checklist.outOfScope?.length > 0) {
-    console.log(`- 不做: ${checklist.outOfScope.join('；')}`);
+    console.log(`- 这次先不做: ${checklist.outOfScope.join('；')}`);
   }
   if (checklist.verification?.length > 0) {
-    console.log(`- 验证: ${checklist.verification.join('；')}`);
+    console.log(`- 完成后会检查: ${checklist.verification.join('；')}`);
   }
   if (checklist.risks?.length > 0) {
-    console.log(`- 风险: ${checklist.risks.join('；')}`);
+    console.log(`- 需要提前知道: ${checklist.risks.join('；')}`);
   }
   if (checklist.confirmationPrompt) {
-    console.log(`- 确认方式: ${checklist.confirmationPrompt}`);
+    console.log(`- 如果要我现在继续: ${checklist.confirmationPrompt}`);
   }
 }
 
@@ -115,64 +115,61 @@ function printRunResult(result, json) {
     return;
   }
 
-  console.log('OpenPrd 运行上下文');
-  console.log(`项目: ${result.projectRoot}`);
-  console.log(`验证: ${result.validation.valid ? '通过' : '失败'}`);
+  console.log('当前进展参考');
+  console.log(`当前项目: ${result.projectRoot}`);
+  console.log(`基础检查: ${result.validation.valid ? '通过' : '失败'}`);
   if (result.lane?.summary) {
-    console.log(`执行流: ${result.lane.summary}`);
+    console.log(`当前处理路径: ${result.lane.summary}`);
   }
   if (result.activeChange) {
-    const label = result.recommendation?.type === 'requirement-intake' ? '历史激活变更' : '激活变更';
+    const label = result.recommendation?.type === 'requirement-intake' ? '历史聚焦事项' : '当前聚焦事项';
     console.log(`${label}: ${result.activeChange}`);
   }
   if (result.focus?.changeId && result.focus.changeId !== result.activeChange) {
-    console.log(`当前目标变更: ${result.focus.changeId}`);
+    console.log(`当前补充焦点: ${result.focus.changeId}`);
   }
   if (result.activeRequirementGate) {
-    console.log(`当前需求入口: ${result.activeRequirementGate.status ?? 'active'}`);
+    const gateStatus = result.activeRequirementGate.status ?? 'active';
+    const gateSuffix = result.activeRequirementGate.relevance === 'background' ? '（仅背景提醒）' : '';
+    console.log(`当前处理阶段: ${gateStatus}${gateSuffix}`);
   }
   if (result.taskSummary) {
-    console.log(`任务: ${result.taskSummary.completed}/${result.taskSummary.total} 完成，${result.taskSummary.pending} 待处理，${result.taskSummary.blocked} 阻塞`);
+    console.log(`后续任务进度: ${result.taskSummary.completed}/${result.taskSummary.total} 完成，${result.taskSummary.pending} 待处理，${result.taskSummary.blocked} 阻塞`);
     if (result.taskSummary.implementation) {
-      console.log(`实质实现任务: ${result.taskSummary.implementation.completed}/${result.taskSummary.implementation.total} 完成，${result.taskSummary.implementation.pending} 待处理`);
+      console.log(`待落地任务: ${result.taskSummary.implementation.completed}/${result.taskSummary.implementation.total} 完成，${result.taskSummary.implementation.pending} 待处理`);
     }
   }
   if (result.discovery) {
-    console.log(`持续发现: ${result.discovery.runId} 已覆盖 ${result.discovery.summary.covered}/${result.discovery.summary.total}，待处理 ${result.discovery.summary.pending}`);
+    console.log(`调研进度: ${result.discovery.runId} 已覆盖 ${result.discovery.summary.covered}/${result.discovery.summary.total}，待处理 ${result.discovery.summary.pending}`);
   }
-  console.log(`下一步类型: ${result.recommendation.type}`);
-  console.log(`下一步: ${result.recommendation.title}`);
+  printKnowledgeSkillMatches(result.knowledgeSkills);
+  console.log('对外表达: 面向用户时，请优先说“本次调整”“后续任务”“继续落地”“完成后检查”这类人话，不要直接复述内部编号、命令、路径、版本号或流程术语。');
+  console.log(`建议下一步: ${result.recommendation.title}`);
   if (result.recommendation.executionMode) {
-    console.log(`执行模式: ${labelExecutionMode(result.recommendation.executionMode)}`);
+    console.log(`推进方式: ${labelExecutionMode(result.recommendation.executionMode)}`);
   }
   if (result.recommendation.parallelPlan?.eligible) {
-    console.log(`并行计划: ${result.recommendation.parallelPlan.summary}`);
-    console.log(`并行分片: ${result.recommendation.parallelPlan.shardBasis}`);
-    console.log(`推荐 Worker 数: ${result.recommendation.parallelPlan.suggestedWorkers}`);
-    if (result.recommendation.parallelPlan.groups?.length > 0) {
-      console.log(`并行分组: ${result.recommendation.parallelPlan.groups.join(', ')}`);
-    }
+    console.log(`协作建议: ${result.recommendation.parallelPlan.summary}`);
   }
-  console.log(`原因: ${result.recommendation.reason}`);
-  console.log(`建议只读命令: ${result.recommendation.command}`);
+  console.log(`这样安排的原因: ${result.recommendation.reason}`);
   if (result.recommendation.preparationCommand || result.recommendation.executionCommand || result.recommendation.commitCommand) {
-    console.log('执行门槛: 仅当用户当前明确要求开发、实现、继续任务、深度调研、深度对标、复刻落地或提交时使用；如果还需要执行授权，先展示执行确认清单，规划、梳理、分析、审查类请求保持只读。');
+    console.log('开始动手前提: 只有在用户明确要求继续落地、实现、修复、深挖或提交时，才继续往下做；如果还缺这一步，就先用人话说明范围和影响。');
   }
   printExecutionConfirmationChecklist(result.recommendation.executionConfirmationChecklist);
   if (result.recommendation.preparationCommand) {
-    console.log(`准备命令: ${result.recommendation.preparationCommand}`);
+    console.log(`内部准备参考: ${result.recommendation.preparationCommand}`);
   }
   if (result.recommendation.executionCommand) {
-    console.log(`执行命令: ${result.recommendation.executionCommand}`);
+    console.log(`内部执行参考: ${result.recommendation.executionCommand}`);
   }
   if (result.recommendation.commitCommand) {
-    console.log(`提交命令: ${result.recommendation.commitCommand}`);
+    console.log(`内部提交参考: ${result.recommendation.commitCommand}`);
   }
   if (result.recommendation.loop?.worktreeRecommended) {
-    console.log('工作区建议: 使用独立 worktree 或等价隔离环境承接单任务 Loop。');
+    console.log('环境建议: 最好放到单独环境里继续，避免和别的事项串线。');
   }
-  console.log(`验证命令: ${result.recommendation.verifyCommand}`);
-  console.log(`状态文件: ${result.files.runState}`);
+  console.log(`内部检查参考: ${result.recommendation.verifyCommand}`);
+  console.log(`内部状态参考: ${result.files.runState}`);
 }
 
 function printLoopResult(result, json) {

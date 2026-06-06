@@ -20,6 +20,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { analyzePrdSnapshot, buildPrdSnapshot, formatVersionId } from './prd-core.js';
+import { formatTemplatePackDisplay } from './product-type-copy.js';
 import { buildSnapshotChangeSummary } from './change-summary.js';
 import { appendReleaseEntry, buildReleaseChangeSummary, buildReleaseLedgerSummary, loadReleaseLedger, saveReleaseLedger, setCurrentReleaseVersion, setReleaseLedgerEnabled, setReleaseVersionStatus } from './release-ledger.js';
 import { validateOpenSpecChangeWorkspace } from './openspec/change-validate.js';
@@ -33,7 +34,7 @@ import { finishLoopWorkspace, initLoopWorkspace, nextLoopWorkspace, planLoopWork
 import { timestamp } from './time.js';
 import { parseCommandArgs, usage } from './cli/args.js';
 import { printAcceptedSpecsResult, printAgentIntegrationResult, printBenchmarkResult, printCaptureResult, printClarifyResult, printClassifyResult, printDevelopmentStandardsResult, printDiagramResult, printDiffResult, printDoctorResult, printFleetResult, printFreezeResult, printGrowthResult, printHandoffResult, printHistoryResult, printInitResult, printInterviewResult, printKnowledgeResult, printLearningResult, printLoopResult, printNextResult, printOpenPrdChangeActionResult, printOpenPrdChangesResult, printOpenSpecChangeValidationResult, printOpenSpecDiscoveryResult, printOpenSpecGenerateResult, printOpenSpecTaskResult, printPlaygroundResult, printQualityResult, printReleaseResult, printReviewResult, printRunResult, printSelfUpdateResult, printStandardsResult, printStatus, printSynthesizeResult, printUpgradeResult, printValidation, printVisualCompareResult } from './cli/print.js';
-import { cjoin, exists, writeJson, writeText, writeYaml } from './fs-utils.js';
+import { cjoin, exists, readJson, writeJson, writeText, writeYaml } from './fs-utils.js';
 import { diagramWorkspace } from './diagram-workspace.js';
 import { createOpenSpecDiscoveryWorkspace } from './discovery.js';
 import { createFleetWorkspace } from './fleet.js';
@@ -42,10 +43,24 @@ import { backfillWorkUnitsWorkspace } from './work-unit-migration.js';
 import { generateLearningReviewWorkspace, setLearningReviewModeWorkspace } from './learning-review.js';
 import { addBenchmarkWorkspace, approveBenchmarkWorkspace, benchmarkWorkspace, listBenchmarkWorkspace, observeBenchmarkSourceWorkspace, verifyBenchmarkWorkspace } from './benchmark.js';
 import { initQualityWorkspace, qualityWorkspace, verifyQualityWorkspace, learnQualityWorkspace } from './quality.js';
-import { archiveKnowledgeCandidate, listKnowledgeCandidates, rejectKnowledgeCandidate, restoreKnowledgeCandidate } from './knowledge.js';
+import {
+  archiveKnowledgeCandidate,
+  listKnowledgeCandidates,
+  recordKnowledgeReviewSignal,
+  rejectKnowledgeCandidate,
+  restoreKnowledgeCandidate,
+  reviewKnowledgeWorkspace,
+} from './knowledge.js';
 import { createRunWorkspace } from './run-harness.js';
 import { checkDevelopmentStandardsWorkspace } from './dev-standards.js';
-import { applyGrowthCandidateWorkspace, checkGrowthWorkspace, initGrowthWorkspace, rejectGrowthCandidateWorkspace, reviewGrowthWorkspace } from './growth.js';
+import {
+  applyGrowthCandidateWorkspace,
+  checkGrowthWorkspace,
+  initGrowthWorkspace,
+  recordGrowthCheckpointWorkspace,
+  rejectGrowthCandidateWorkspace,
+  reviewGrowthWorkspace,
+} from './growth.js';
 import { buildReviewPresentationTemplatePayload, reviewPresentationWorkspace } from './review-presentation.js';
 import { analyzeWorkspaceRegistryHygiene } from './registry-hygiene.js';
 import { syncSessionBindingFromChange } from './session-binding.js';
@@ -114,7 +129,7 @@ async function initWorkspace(projectRoot, options) {
   });
   await appendProgress(workspace, [
     `已初始化工作区: ${workspace.workspaceRoot}。`,
-    `模板包: ${currentState.templatePack}。`,
+    `场景模板: ${formatTemplatePackDisplay(currentState.templatePack, { fallback: '待确认' })}。`,
   ]);
 
   return { ws: workspace, created: ws.created, currentState, standards, quality, growth, agentIntegration };
@@ -220,9 +235,56 @@ async function doctorWorkspace(projectRoot, options = {}) {
     ...((workspaceRegistry?.staleEntries ?? []).map((entry) => `registry: stale workspace ${entry.workspaceRoot} (${entry.reason})`)),
     ...((sessionRegistry?.staleEntries ?? []).map((entry) => `session-registry: stale session ${entry.sessionId} (${entry.reason})`)),
   ];
+  const doctorOk = agentIntegration.ok && (codexRuntime?.ok ?? true) && standards.ok && validation.valid;
+  const latestQuality = await readJson(cjoin(projectRoot, '.openprd', 'quality', 'reports', 'latest.json')).catch(() => null);
+  const doctorSignal = doctorOk
+    ? {
+      kind: 'doctor-green',
+      ok: true,
+      summary: 'doctor passed',
+    }
+    : null;
+  if (doctorSignal) {
+    await recordKnowledgeReviewSignal(projectRoot, doctorSignal).catch(() => null);
+  }
+  const growthCheckpoint = doctorSignal
+    ? await recordGrowthCheckpointWorkspace(projectRoot, {
+      outcome: 'doctor-passed',
+      reason: 'doctor-post-completion',
+    }).catch((error) => ({
+      ok: false,
+      action: 'growth-checkpoint',
+      projectRoot,
+      recorded: false,
+      errors: [error instanceof Error ? error.message : String(error)],
+    }))
+    : {
+      ok: true,
+      action: 'growth-checkpoint',
+      projectRoot,
+      recorded: false,
+      skipped: true,
+      reason: 'doctor-not-green',
+    };
+  const knowledgeReview = doctorSignal
+    ? await reviewKnowledgeWorkspace(projectRoot, {
+      from: latestQuality?.jsonPath ?? null,
+      signal: doctorSignal,
+    }).catch((error) => ({
+      ok: false,
+      action: 'quality-knowledge-review',
+      skipped: false,
+      errors: [error instanceof Error ? error.message : String(error)],
+    }))
+    : {
+      ok: true,
+      action: 'quality-knowledge-review',
+      skipped: true,
+      reason: 'doctor-not-green',
+    };
 
   return {
-    ok: agentIntegration.ok && (codexRuntime?.ok ?? true) && standards.ok && validation.valid,
+    ok: doctorOk,
     action: 'doctor',
     projectRoot,
     tools: agentIntegration.tools,
@@ -236,6 +298,8 @@ async function doctorWorkspace(projectRoot, options = {}) {
       hygiene: registryHygiene,
       warnings: registryWarnings,
     },
+    growthCheckpoint,
+    knowledgeReview,
     errors: [
       ...agentIntegration.errors,
       ...(codexRuntime?.errors ?? []).map((error) => `codex-runtime: ${error}`),
@@ -366,17 +430,15 @@ async function freezeWorkspace(projectRoot) {
     digest,
   });
   await appendVerification(ws, [
-    'Freeze 验证通过。',
-    `版本: ${snapshot.latestVersionId}`,
-    `Digest: ${digest}`,
-    `PRD 版本: ${snapshot.prdVersion}`,
+    '定稿前检查通过。',
+    `本次确认稿: ${snapshot.latestVersionId}`,
+    `需求稿版本序号: ${snapshot.prdVersion}`,
   ]);
   await appendProgress(ws, [
-    `已 freeze PRD 版本 ${snapshot.latestVersionId}。`,
-    `Digest: ${digest}`,
+    `这版需求已经定稿。`,
   ]);
   await appendDecision(ws, [
-    `已 freeze 版本 ${snapshot.latestVersionId}。`,
+    '这版需求已经定稿。',
     `已准备好交接给 ${resolveActiveTemplatePack(ws) === 'base' ? '下游执行方' : '执行系统'}。`,
   ]);
   await writeJson(ws.paths.taskGraph, buildWorkflowTaskGraph(storedCurrentState));
@@ -439,7 +501,7 @@ async function handoffWorkspace(projectRoot, target) {
   const summarySection = handoff.changeSummary.markdown
     ? `\n## 变化摘要\n\n${handoff.changeSummary.markdown}\n`
     : '';
-  const handoffMarkdown = `# 交接\n\n- 目标: ${target}\n- 版本: ${handoff.versionId}\n${handoff.projectVersion ? `- 项目版本: ${handoff.projectVersion}\n` : ''}- Schema: ${handoff.schema}\n- 模板包: ${handoff.templatePack}\n- Digest: ${handoff.digest}\n- 下一步: ${handoff.nextStep}\n${summarySection}`;
+  const handoffMarkdown = `# 交接\n\n- 交接去向: ${target}\n${handoff.projectVersion ? `- 项目版本: ${handoff.projectVersion}\n` : ''}- 使用格式: ${handoff.schema}\n- 场景模板: ${formatTemplatePackDisplay(handoff.templatePack, { fallback: '待确认' })}\n- 下一步: ${handoff.nextStep}\n${summarySection}`;
   await writeText(cjoin(exportDir, 'handoff.md'), handoffMarkdown);
   await writeText(ws.paths.activeHandoff, handoffMarkdown);
   if (await exists(ws.paths.activeArchitectureDiagramHtml)) {
@@ -779,6 +841,7 @@ export async function main(argv = process.argv.slice(2)) {
         context: flags.context,
         verify: flags.verify,
         recordHook: flags.recordHook,
+        hookInject: flags.hookInject,
         event: flags.event,
         risk: flags.risk,
         outcome: flags.outcome,
@@ -887,6 +950,7 @@ export async function main(argv = process.argv.slice(2)) {
         actual: flags.actual,
         before: flags.before,
         after: flags.after,
+        board: flags.board,
         out: flags.out,
         format: flags.format,
         quality: flags.quality,

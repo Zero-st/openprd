@@ -12,6 +12,12 @@ function normalizeWorkspacePath(value) {
 
 function inferVisualReviewMode(value) {
   const normalized = normalizeWorkspacePath(value).toLowerCase();
+  if (normalized.includes('visual-focus-board') || normalized.includes('focus-board') || normalized.includes('focus-region')) {
+    return 'focus-board';
+  }
+  if (normalized.includes('visual-parallel-board') || normalized.includes('parallel-board') || normalized.includes('experiment-board')) {
+    return 'parallel-board';
+  }
   if (normalized.includes('visual-before-after') || normalized.includes('before-after')) {
     return 'before-after';
   }
@@ -117,38 +123,93 @@ export function detectVisualReview({ policy, activeChangeContext, activeTasks, v
     '用户给图',
     '图片资产',
   ];
+  const focusTokens = [
+    'focus board',
+    'focus region',
+    'focus-region',
+    'local compare',
+    'zoom compare',
+    '局部对比',
+    '局部放大',
+    '焦点区域',
+    'focus',
+  ];
+  const parallelTokens = [
+    'parallel board',
+    'parallel experiment',
+    'experiment board',
+    'evidence board',
+    '并行实验',
+    '并行方向',
+    '多方向实验',
+    '方案对比板',
+    '证据板',
+  ];
   const expectsReferenceCompare = includesAny(haystack, referenceTokens);
+  const expectsFocusBoard = includesAny(haystack, focusTokens);
+  const expectsParallelBoard = includesAny(haystack, parallelTokens);
   const referenceArtifacts = visualArtifacts.filter((artifact) => artifact.mode === 'reference-actual');
   const beforeAfterArtifacts = visualArtifacts.filter((artifact) => artifact.mode === 'before-after');
-  const matchingArtifacts = expectsReferenceCompare
-    ? referenceArtifacts
-    : [...referenceArtifacts, ...beforeAfterArtifacts];
+  const focusArtifacts = visualArtifacts.filter((artifact) => artifact.mode === 'focus-board');
+  const parallelArtifacts = visualArtifacts.filter((artifact) => artifact.mode === 'parallel-board');
+  let matchingArtifacts;
+  if (expectsParallelBoard) {
+    matchingArtifacts = parallelArtifacts;
+  } else if (expectsFocusBoard) {
+    matchingArtifacts = focusArtifacts;
+  } else if (expectsReferenceCompare) {
+    matchingArtifacts = referenceArtifacts;
+  } else {
+    matchingArtifacts = [...referenceArtifacts, ...beforeAfterArtifacts, ...focusArtifacts, ...parallelArtifacts];
+  }
   const evidenceSources = matchingArtifacts.slice(0, 12).map((artifact) => ({
     path: artifact.path,
-    source: artifact.mode === 'reference-actual' ? 'visual-review/reference-actual' : 'visual-review/before-after',
+    source: artifact.mode === 'reference-actual'
+      ? 'visual-review/reference-actual'
+      : artifact.mode === 'before-after'
+        ? 'visual-review/before-after'
+        : artifact.mode === 'focus-board'
+          ? 'visual-review/focus-board'
+          : 'visual-review/parallel-board',
   }));
   const warnings = [];
 
   if (relevant && matchingArtifacts.length === 0) {
     warnings.push(
-      expectsReferenceCompare
+      expectsParallelBoard
+        ? '检测到界面视觉改动且用户在比较多方向实验，但未看到本次并行实验证据板。'
+        : expectsFocusBoard
+          ? '检测到界面视觉改动且用户在关注局部细节，但未看到本次局部焦点证据板。'
+          : expectsReferenceCompare
         ? '检测到界面视觉改动且已有参考图/设计稿语义，但未看到本次“效果图 / 实现截图”对比证据。'
         : '检测到界面视觉改动，但未看到本次 visual-compare 产出的视觉对比或修改前后自检证据。'
     );
   } else if (relevant && expectsReferenceCompare && referenceArtifacts.length === 0 && beforeAfterArtifacts.length > 0) {
     warnings.push('当前只发现修改前后自检图；如果已有参考图或设计稿，请补一份“效果图 / 实现截图”对比图。');
+  } else if (relevant && expectsFocusBoard && focusArtifacts.length === 0 && matchingArtifacts.length > 0) {
+    warnings.push('当前有视觉证据，但局部细节仍建议补一份局部焦点证据板，方便围绕编号区域复核。');
+  } else if (relevant && expectsParallelBoard && parallelArtifacts.length === 0 && matchingArtifacts.length > 0) {
+    warnings.push('当前有视觉证据，但多方向实验仍建议补一份并行实验证据板，把方案和指标放到同一板里审查。');
   }
 
   const summary = !relevant
     ? '当前场景未要求视觉评审证据'
     : matchingArtifacts.length > 0
       ? (
-          expectsReferenceCompare
+          expectsParallelBoard
+            ? `已找到 ${matchingArtifacts.length} 份并行实验证据板`
+            : expectsFocusBoard
+              ? `已找到 ${matchingArtifacts.length} 份局部焦点证据板`
+              : expectsReferenceCompare
             ? `已找到 ${matchingArtifacts.length} 份效果图 / 实现截图对比证据`
-            : `已找到 ${matchingArtifacts.length} 份视觉对比或修改前后自检证据`
+            : `已找到 ${matchingArtifacts.length} 份视觉对比、局部焦点或修改前后自检证据`
         )
       : (
-          expectsReferenceCompare
+          expectsParallelBoard
+            ? '未找到本次并行实验证据板'
+            : expectsFocusBoard
+              ? '未找到本次局部焦点证据板'
+              : expectsReferenceCompare
             ? '未找到本次效果图 / 实现截图对比证据'
             : '未找到本次 visual-compare 视觉证据'
         );
@@ -157,6 +218,8 @@ export function detectVisualReview({ policy, activeChangeContext, activeTasks, v
     status: !relevant || matchingArtifacts.length > 0 ? 'pass' : 'needs-evidence',
     relevant,
     expectsReferenceCompare,
+    expectsFocusBoard,
+    expectsParallelBoard,
     artifacts: visualArtifacts,
     matchingArtifacts,
     warnings,

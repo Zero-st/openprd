@@ -47,6 +47,29 @@ function printKnowledgeReview(knowledgeReview) {
   }
 }
 
+function knowledgeAdoptionLabel(adoption = {}) {
+  return `命中 ${adoption.hitCount ?? 0} / 引用 ${adoption.referencedCount ?? 0} / 注入 ${adoption.injectedCount ?? 0}`;
+}
+
+function printKnowledgeSkillMatches(knowledgeSkills) {
+  const matched = Array.isArray(knowledgeSkills?.matched) ? knowledgeSkills.matched : [];
+  if (matched.length === 0) {
+    return;
+  }
+  const summary = knowledgeSkills?.summary ?? {};
+  console.log(`项目级 Skill: 命中 ${matched.length} 个${summary.hookInjected ? '，已自动注入当前上下文' : ''}`);
+  for (const skill of matched.slice(0, 3)) {
+    console.log(`- ${skill.skillName}: ${skill.matchSummary ?? '命中当前上下文'}`);
+    if (skill.description) {
+      console.log(`  说明: ${skill.description}`);
+    }
+    if (Array.isArray(skill.touchedFiles) && skill.touchedFiles.length > 0) {
+      console.log(`  相关文件: ${skill.touchedFiles.slice(0, 4).join('；')}`);
+    }
+    console.log(`  复用指标: ${knowledgeAdoptionLabel(skill.adoption ?? {})}`);
+  }
+}
+
 function optionalCapabilityLocationLabel(location) {
   const clientLabels = {
     codex: 'Codex',
@@ -97,6 +120,8 @@ function printOptionalCapabilitySuggestions(optionalCapabilities) {
 }
 
 export {
+  knowledgeAdoptionLabel,
   printKnowledgeReview,
+  printKnowledgeSkillMatches,
   printOptionalCapabilitySuggestions,
 };

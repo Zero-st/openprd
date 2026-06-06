@@ -93,6 +93,53 @@ import {
   synthesizeWorkspace,
   writeMinimalChange,
 } from './helpers/openprd-test-helpers.js';
+
+async function seedKnowledgeSkill(project, skillName = 'billing-trace-rollback') {
+  const skillDir = path.join(project, '.openprd', 'knowledge', 'skills', skillName);
+  const skillPath = path.join(skillDir, 'SKILL.md');
+  await fs.mkdir(skillDir, { recursive: true });
+  await fs.writeFile(skillPath, [
+    '---',
+    `name: ${skillName}`,
+    'description: 当处理 billing-api.js、traceId 透传或 webhook 回滚时，先复用这份项目级排查经验。',
+    '---',
+    '',
+    `# ${skillName}`,
+    '',
+    '## 触发场景',
+    '- 修改 `src/billing-api.js`',
+    '- 处理 traceId 透传',
+    '- 修 webhook 回滚',
+    '',
+    '## 先看什么',
+    '- `src/billing-api.js`',
+    '- `docs/basic/backend-structure.md`',
+    '',
+    '## 可复用模式',
+    '- 先确认 traceId 在 API 和 webhook 链路里一致透传',
+    '',
+  ].join('\n'));
+  await fs.writeFile(path.join(project, '.openprd', 'knowledge', 'index.json'), `${JSON.stringify({
+    version: 2,
+    updatedAt: '2026-06-05 15:10:00',
+    incidents: [],
+    patterns: [],
+    skills: [
+      {
+        skillName,
+        path: skillPath,
+        sourceKind: 'manual',
+        sourceRef: 'seeded-test-skill',
+        touchedFiles: ['src/billing-api.js'],
+        triggerHints: ['traceId 透传', 'webhook 回滚'],
+      },
+    ],
+    candidates: [],
+    drafts: [],
+  }, null, 2)}\n`);
+  return { skillDir, skillPath };
+}
+
 test('run exposes hook-stable context and records hook iterations', async () => {
   const project = await makeTempProject();
   await initWorkspace(project, { templatePack: 'consumer' });
@@ -125,11 +172,11 @@ test('run exposes hook-stable context and records hook iterations', async () => 
   assert.ok(context.recommendation.parallelPlan.workerCandidates.length > 0);
   assert.equal(context.recommendation.intentGate.confirmationChecklistRequired, true);
   assert.equal(context.recommendation.executionConfirmationChecklist.required, true);
-  assert.equal(context.recommendation.executionConfirmationChecklist.title, '执行确认清单');
-  assert.ok(context.recommendation.executionConfirmationChecklist.implementationItems.some((item) => item.includes('openprd loop . --run --agent codex')));
-  assert.ok(context.recommendation.executionConfirmationChecklist.implementationItems.some((item) => item.includes('并行策略:')));
-  assert.ok(context.recommendation.executionConfirmationChecklist.outOfScope.some((item) => item.includes('不默认处理清单外')));
-  assert.ok(context.recommendation.executionConfirmationChecklist.verification.some((item) => item.includes('openprd dev-check')));
+  assert.equal(context.recommendation.executionConfirmationChecklist.title, '开始动手前先确认这些');
+  assert.ok(context.recommendation.executionConfirmationChecklist.implementationItems.some((item) => item.includes('我会先核对当前情况')));
+  assert.ok(context.recommendation.executionConfirmationChecklist.implementationItems.some((item) => item.includes('如果需要多人配合')));
+  assert.ok(context.recommendation.executionConfirmationChecklist.outOfScope.some((item) => item.includes('不会默认处理这次范围以外的历史问题')));
+  assert.ok(context.recommendation.executionConfirmationChecklist.verification.some((item) => item.includes('完成后我会补做这次调整需要的检查')));
   assert.ok(context.recommendation.command.includes('openprd tasks . --change'));
   assert.ok(context.recommendation.preparationCommand.includes('openprd loop . --plan --change'));
   assert.ok(context.recommendation.executionCommand.includes('openprd loop . --run --agent codex'));
@@ -172,11 +219,11 @@ test('run exposes hook-stable context and records hook iterations', async () => 
   } finally {
     console.log = originalLog;
   }
-  assert.ok(logs.some((line) => line.includes('OpenPrd 运行上下文')));
-  assert.ok(logs.some((line) => line.includes('建议只读命令')));
-  assert.ok(logs.some((line) => line.includes('执行门槛')));
-  assert.ok(logs.some((line) => line.includes('执行模式:')));
-  assert.ok(logs.some((line) => line.includes('并行计划:')));
+  assert.ok(logs.some((line) => line.includes('当前进展参考')));
+  assert.ok(logs.some((line) => line.includes('对外表达:')));
+  assert.ok(logs.some((line) => line.includes('开始动手前提')));
+  assert.ok(logs.some((line) => line.includes('环境建议:')));
+  assert.ok(logs.some((line) => line.includes('内部检查参考:')));
 
   const continuationLogs = [];
   console.log = (...args) => continuationLogs.push(args.join(' '));
@@ -185,9 +232,16 @@ test('run exposes hook-stable context and records hook iterations', async () => 
   } finally {
     console.log = originalLog;
   }
-  assert.ok(continuationLogs.some((line) => line.includes('执行流: 继续已有任务')));
-  assert.ok(continuationLogs.some((line) => line.includes('下一步类型: session-continuation')));
+  assert.ok(continuationLogs.some((line) => line.includes('当前处理路径: 继续已有任务')));
+  assert.equal(continuationLogs.some((line) => line.includes('下一步类型: session-continuation')), false);
   assert.ok(continuationLogs.some((line) => line.includes('会话 ID')));
+
+  const bareSessionContext = await runWorkspace(project, {
+    context: true,
+    message: '看下这个 codex 对话记录：019e9b0e-00dc-7ca2-b673-157af1082f5c，先分析一下为什么会误判为 L2。',
+  });
+  assert.equal(bareSessionContext.lane.kind, 'default');
+  assert.notEqual(bareSessionContext.recommendation.type, 'session-continuation');
 
   const tasksPath = path.join(project, 'openprd', 'changes', 'run-loop', 'tasks.md');
   const tasksText = await fs.readFile(tasksPath, 'utf8');
@@ -210,6 +264,49 @@ test('run exposes hook-stable context and records hook iterations', async () => 
   const verified = await runWorkspace(project, { verify: true });
   assert.equal(verified.ok, true);
   assert.ok(verified.checks.some((check) => check.name === 'change' && check.ok));
+  assert.match(verified.recommendation.type, /^verification-/);
+
+  const runState = JSON.parse(await fs.readFile(path.join(project, '.openprd', 'harness', 'run-state.json'), 'utf8'));
+  assert.match(runState.lastRecommendation.type, /^verification-/);
+  assert.equal(runState.lastVerification.taskReady, true);
+
+  const contextAfterVerify = await runWorkspace(project, { context: true });
+  assert.equal(
+    [runState.lastRecommendation.type, 'change-review'].includes(contextAfterVerify.recommendation.type),
+    true,
+  );
+  assert.doesNotMatch(contextAfterVerify.recommendation.type, /clarify-user/i);
+});
+
+test('run context auto-matches project knowledge skills and records adoption', async () => {
+  const project = await makeTempProject();
+  await initWorkspace(project, { templatePack: 'consumer' });
+  await seedKnowledgeSkill(project);
+
+  const context = await runWorkspace(project, {
+    context: true,
+    message: '请继续处理 src/billing-api.js 里的 traceId 透传和 webhook 回滚。',
+  });
+  assert.equal(context.knowledgeSkills.summary.matched, 1);
+  assert.equal(context.knowledgeSkills.summary.hookInjected, false);
+  assert.equal(context.knowledgeSkills.matched[0].skillName, 'billing-trace-rollback');
+  assert.match(context.knowledgeSkills.matched[0].matchSummary, /traceId|billing-api|webhook/i);
+
+  const knowledgeIndex = JSON.parse(await fs.readFile(path.join(project, '.openprd', 'knowledge', 'index.json'), 'utf8'));
+  assert.equal(knowledgeIndex.skills[0].adoption.hitCount, 1);
+  assert.equal(knowledgeIndex.skills[0].adoption.referencedCount, 1);
+  assert.equal(knowledgeIndex.skills[0].adoption.injectedCount, 0);
+
+  const logs = [];
+  const originalLog = console.log;
+  console.log = (...args) => logs.push(args.join(' '));
+  try {
+    assert.equal(await main(['run', project, '--context', '--message', '请继续处理 src/billing-api.js 里的 traceId 透传和 webhook 回滚。']), 0);
+  } finally {
+    console.log = originalLog;
+  }
+  assert.ok(logs.some((line) => line.includes('项目级 Skill: 命中 1 个')));
+  assert.ok(logs.some((line) => line.includes('billing-trace-rollback')));
 });
 
 test('run context keeps lightweight task advance below the implementation task threshold', async () => {
@@ -248,7 +345,7 @@ test('run context keeps lightweight task advance below the implementation task t
   assert.equal(context.recommendation.executionMode, 'serial');
   assert.equal(context.recommendation.parallelPlan.eligible, false);
   assert.equal(context.recommendation.executionConfirmationChecklist.required, true);
-  assert.ok(context.recommendation.executionConfirmationChecklist.implementationItems.some((item) => item.includes('openprd tasks . --change')));
+  assert.ok(context.recommendation.executionConfirmationChecklist.implementationItems.some((item) => item.includes('我只会在这次已经确认的范围内继续')));
   assert.ok(context.recommendation.command.includes('openprd tasks . --change'));
 });
 
@@ -298,7 +395,7 @@ test('run context recommends parallel workers before the isolated loop threshold
   assert.ok(context.recommendation.parallelPlan.workerCandidates.length > 0);
   assert.ok(context.recommendation.parallelPlan.groups.includes('implementation') || context.recommendation.parallelPlan.groups.includes('contracts'));
   assert.ok(context.recommendation.preparationCommand.includes('openprd loop . --plan --change'));
-  assert.ok(context.recommendation.reason.includes('并行候选阈值'));
+  assert.ok(context.recommendation.reason.includes('分头推进'));
 });
 
 test('run context prioritizes active requirement intake over historical active change tasks', async () => {
@@ -338,7 +435,7 @@ test('run context prioritizes active requirement intake over historical active c
   assert.equal(context.recommendation.type, 'requirement-intake');
   assert.equal(context.recommendation.changeId, null);
   assert.ok(context.recommendation.command.includes('openprd clarify'));
-  assert.ok(context.recommendation.reason.includes('历史 active change historical-change 仅作为提醒'));
+  assert.ok(context.recommendation.reason.includes('历史事项 historical-change'));
 
   const continuationContext = await runWorkspace(project, {
     context: true,
@@ -350,6 +447,49 @@ test('run context prioritizes active requirement intake over historical active c
   assert.ok(continuationContext.recommendation.reason.includes('不能用相似历史、当前 active change'));
   assert.ok(continuationContext.recommendation.reason.includes('只作为背景提醒'));
   assert.equal(continuationContext.recommendation.reason.includes('存在一个依赖已就绪的 OpenPrd 任务'), false);
+});
+
+test('run context keeps stale requirement intake as background reminder for unrelated L0 bugfix prompts', async () => {
+  const project = await makeTempProject();
+  await initWorkspace(project, { templatePack: 'consumer' });
+  await synthesizeWorkspace(project, {
+    title: 'Historical Change',
+    owner: 'PM',
+    problemStatement: 'The workspace has an older unfinished change',
+    whyNow: 'The older change should not take over an unrelated bugfix',
+    primaryUsers: ['Product agents'],
+    goals: ['Keep stale intake separate from current bugfix routing'],
+    successMetrics: ['Run context does not default back to requirement-intake'],
+    acceptanceGoals: ['Historical intake stays visible as background only'],
+    inScope: ['Run context recommendation'],
+    outOfScope: ['Executing the older task'],
+    primaryFlows: ['Agent reads run context'],
+    functional: ['Expose next task'],
+    productType: 'consumer',
+  });
+  await reviewWorkspace(project, { mark: 'confirmed' });
+  await generateOpenSpecChangeWorkspace(project, { change: 'historical-change' });
+  await fs.writeFile(path.join(project, '.openprd', 'harness', 'requirement-gate.json'), JSON.stringify({
+    version: 1,
+    active: true,
+    status: 'requires-clarification',
+    openedAt: '2026-05-25 10:00:00',
+    updatedAt: '2026-05-25 10:00:00',
+    promptPreview: '新增一个 AI 团队协同模式，先做需求入口澄清。',
+    requiredFlow: ['clarify', 'capture', 'synthesize', 'review', 'change-generate', 'tasks', 'implementation'],
+    intakeMode: 'focused-reflection',
+  }, null, 2));
+
+  const context = await runWorkspace(project, {
+    context: true,
+    message: 'Windows 用户更新新版本时报错，帮我先定位原因，能修就直接修。',
+  });
+  assert.equal(context.activeRequirementGate.status, 'requires-clarification');
+  assert.equal(context.activeRequirementGate.relevance, 'background');
+  assert.equal(context.activeRequirementGate.matchedCurrentMessage, false);
+  assert.notEqual(context.recommendation.type, 'requirement-intake');
+  assert.ok(context.recommendation.reason.includes('旧 gate 仅作为背景提醒'));
+  assert.ok(context.recommendation.reason.includes('历史需求摘要'));
 });
 
 test('run context can route by user-described requirement instead of the global active change', async () => {

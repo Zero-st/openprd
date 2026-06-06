@@ -8,6 +8,8 @@ export const OPENPRD_GROWTH_CANDIDATES = path.join(OPENPRD_GROWTH_DIR, 'candidat
 export const OPENPRD_GROWTH_ACCEPTED = path.join(OPENPRD_GROWTH_DIR, 'accepted.json');
 export const OPENPRD_GROWTH_REJECTED = path.join(OPENPRD_GROWTH_DIR, 'rejected.json');
 export const OPENPRD_GROWTH_LOCAL_PREFERENCES = path.join(OPENPRD_GROWTH_DIR, 'preferences.local.json');
+export const OPENPRD_GROWTH_LEDGER = path.join(OPENPRD_GROWTH_DIR, 'ledger.json');
+export const OPENPRD_GROWTH_EVENTS = path.join(OPENPRD_GROWTH_DIR, 'events.jsonl');
 export const OPENPRD_STANDARDS_CONFIG = path.join('.openprd', 'standards', 'config.json');
 
 export const DEFAULT_GROWTH_CONFIG = {
@@ -77,6 +79,32 @@ async function readJsonlIfExists(filePath) {
 
 function normalizeArray(value) {
   return Array.isArray(value) ? value.filter((item) => item !== null && item !== undefined) : [];
+}
+
+function defaultGrowthLedger() {
+  return {
+    version: 1,
+    updatedAt: nowIso(),
+    summary: {
+      eventCount: 0,
+      observed: 0,
+      pendingObserved: 0,
+      autoApplied: 0,
+      manualApplied: 0,
+      reconciledAutoApplied: 0,
+      rejected: 0,
+      skipped: 0,
+      completionCheckpoints: 0,
+      skippedReasons: {},
+      current: {
+        total: 0,
+        pending: 0,
+        applied: 0,
+        rejected: 0,
+      },
+    },
+    recentEvents: [],
+  };
 }
 
 function normalizeCandidate(raw = {}) {
@@ -162,6 +190,7 @@ async function ensureGrowthFiles(projectRoot) {
   const acceptedPath = growthPath(projectRoot, OPENPRD_GROWTH_ACCEPTED);
   const rejectedPath = growthPath(projectRoot, OPENPRD_GROWTH_REJECTED);
   const localPreferencesPath = growthPath(projectRoot, OPENPRD_GROWTH_LOCAL_PREFERENCES);
+  const ledgerPath = growthPath(projectRoot, OPENPRD_GROWTH_LEDGER);
   if (!(await exists(acceptedPath))) {
     await writeJson(acceptedPath, { version: 1, candidates: [] });
   }
@@ -171,12 +200,136 @@ async function ensureGrowthFiles(projectRoot) {
   if (!(await exists(localPreferencesPath))) {
     await writeJson(localPreferencesPath, { version: 1, preferences: {} });
   }
+  if (!(await exists(ledgerPath))) {
+    await writeJson(ledgerPath, defaultGrowthLedger());
+  }
 }
 
 async function readGrowthAutoApplyConfig(projectRoot) {
   const configPath = growthPath(projectRoot, OPENPRD_STANDARDS_CONFIG);
   const config = await readJsonIfExists(configPath, null);
   return normalizeGrowthConfig(config?.growth).autoApply;
+}
+
+function normalizeGrowthLedgerEvent(event = {}) {
+  return {
+    version: 1,
+    at: event.at ?? nowIso(),
+    action: String(event.action ?? 'observe').trim() || 'observe',
+    outcome: String(event.outcome ?? 'recorded').trim() || 'recorded',
+    candidateId: event.candidateId ? String(event.candidateId) : null,
+    candidateType: event.candidateType ? String(event.candidateType) : null,
+    scope: event.scope ? String(event.scope) : null,
+    autoApplied: event.autoApplied === true,
+    applyMode: event.applyMode ? String(event.applyMode) : null,
+    reason: event.reason ? String(event.reason) : null,
+    changed: normalizeArray(event.changed).map((item) => String(item)),
+  };
+}
+
+function summarizeGrowthLedgerEvents(events = [], state = { candidates: [] }) {
+  const summary = defaultGrowthLedger().summary;
+  summary.eventCount = events.length;
+  for (const rawEvent of events) {
+    const event = normalizeGrowthLedgerEvent(rawEvent);
+    if (event.action === 'observe') {
+      summary.observed += 1;
+      if (event.outcome === 'pending-recorded') {
+        summary.pendingObserved += 1;
+      }
+      if (event.outcome.startsWith('skipped-')) {
+        summary.skipped += 1;
+        const reason = event.outcome.replace(/^skipped-/, '') || 'unknown';
+        summary.skippedReasons[reason] = (summary.skippedReasons[reason] ?? 0) + 1;
+      }
+      if (event.autoApplied) {
+        summary.autoApplied += 1;
+      }
+    } else if (event.action === 'apply' && event.applyMode === 'manual') {
+      summary.manualApplied += 1;
+    } else if (event.action === 'reconcile' && event.autoApplied) {
+      summary.reconciledAutoApplied += 1;
+      summary.autoApplied += 1;
+    } else if (event.action === 'reject') {
+      summary.rejected += 1;
+    } else if (event.action === 'checkpoint') {
+      summary.completionCheckpoints += 1;
+    }
+  }
+  const pending = state.candidates.filter((candidate) => candidate.status === 'pending').length;
+  const applied = state.candidates.filter((candidate) => candidate.status === 'applied').length;
+  const rejected = state.candidates.filter((candidate) => candidate.status === 'rejected').length;
+  summary.current = {
+    total: state.candidates.length,
+    pending,
+    applied,
+    rejected,
+  };
+  return summary;
+}
+
+async function syncGrowthLedger(projectRoot, event = null) {
+  if (event) {
+    await appendJsonl(growthPath(projectRoot, OPENPRD_GROWTH_EVENTS), normalizeGrowthLedgerEvent(event));
+  }
+  const state = await readGrowthState(projectRoot);
+  const events = await readJsonlIfExists(growthPath(projectRoot, OPENPRD_GROWTH_EVENTS));
+  const normalizedEvents = events.map((entry) => normalizeGrowthLedgerEvent(entry));
+  const ledger = {
+    ...defaultGrowthLedger(),
+    updatedAt: nowIso(),
+    summary: summarizeGrowthLedgerEvents(normalizedEvents, state),
+    recentEvents: normalizedEvents.slice(-12).reverse(),
+  };
+  await writeJson(growthPath(projectRoot, OPENPRD_GROWTH_LEDGER), ledger);
+  return ledger;
+}
+
+export async function recordGrowthCheckpointWorkspace(projectRoot, options = {}) {
+  await ensureGrowthFiles(projectRoot);
+  const outcome = String(options.outcome ?? 'quality-verify').trim() || 'quality-verify';
+  const reason = String(options.reason ?? outcome).trim() || outcome;
+  const scope = String(options.scope ?? 'project').trim() || 'project';
+  const changed = normalizeArray(options.changed).map((item) => String(item));
+  const recentEvents = await readJsonlIfExists(growthPath(projectRoot, OPENPRD_GROWTH_EVENTS));
+  const normalizedRecent = recentEvents
+    .map((entry) => normalizeGrowthLedgerEvent(entry))
+    .slice(-24)
+    .reverse();
+  const duplicate = normalizedRecent.find((event) => (
+    event.action === 'checkpoint'
+    && event.outcome === outcome
+    && String(event.reason ?? '') === reason
+    && String(event.scope ?? '') === scope
+  ));
+  if (duplicate) {
+    const ledger = await syncGrowthLedger(projectRoot);
+    return {
+      ok: true,
+      action: 'growth-checkpoint',
+      projectRoot,
+      recorded: false,
+      reason: 'duplicate-checkpoint',
+      event: duplicate,
+      ledger,
+    };
+  }
+  const event = normalizeGrowthLedgerEvent({
+    action: 'checkpoint',
+    outcome,
+    reason,
+    scope,
+    changed,
+  });
+  const ledger = await syncGrowthLedger(projectRoot, event);
+  return {
+    ok: true,
+    action: 'growth-checkpoint',
+    projectRoot,
+    recorded: true,
+    event,
+    ledger,
+  };
 }
 
 async function reconcilePendingAutoApplyCandidates(projectRoot, options = {}) {
@@ -205,17 +358,36 @@ async function reconcilePendingAutoApplyCandidates(projectRoot, options = {}) {
 export async function initGrowthWorkspace(projectRoot) {
   await ensureGrowthFiles(projectRoot);
   const reconciled = await reconcilePendingAutoApplyCandidates(projectRoot);
+  for (const candidate of reconciled) {
+    await syncGrowthLedger(projectRoot, {
+      action: 'reconcile',
+      outcome: 'auto-applied',
+      candidateId: candidate.id,
+      candidateType: candidate.type,
+      scope: candidate.scope,
+      autoApplied: true,
+      applyMode: 'auto',
+      reason: candidate.applyReason ?? 'safe-code-extension',
+      changed: candidate.appliedChanges,
+    });
+  }
+  const ledger = reconciled.length > 0
+    ? await readJsonIfExists(growthPath(projectRoot, OPENPRD_GROWTH_LEDGER), defaultGrowthLedger())
+    : await syncGrowthLedger(projectRoot);
   return {
     ok: true,
     action: 'growth-init',
     projectRoot,
     reconciledAutoApplied: reconciled,
+    ledger,
     files: {
       dir: OPENPRD_GROWTH_DIR,
       candidates: OPENPRD_GROWTH_CANDIDATES,
       accepted: OPENPRD_GROWTH_ACCEPTED,
       rejected: OPENPRD_GROWTH_REJECTED,
       localPreferences: OPENPRD_GROWTH_LOCAL_PREFERENCES,
+      ledger: OPENPRD_GROWTH_LEDGER,
+      events: OPENPRD_GROWTH_EVENTS,
     },
   };
 }
@@ -236,13 +408,31 @@ async function readGrowthState(projectRoot) {
 export async function observeGrowthWorkspace(projectRoot, rawCandidate = {}, options = {}) {
   const candidate = normalizeCandidate(rawCandidate);
   if (!candidate.type || !candidate.key) {
-    return { ok: false, action: 'growth-observe', skipped: true, reason: 'missing-type-or-key', candidate };
+    const result = { ok: false, action: 'growth-observe', skipped: true, reason: 'missing-type-or-key', candidate };
+    result.ledger = await syncGrowthLedger(projectRoot, {
+      action: 'observe',
+      outcome: 'skipped-missing-type-or-key',
+      candidateId: candidate.id,
+      candidateType: candidate.type,
+      scope: candidate.scope,
+      reason: result.reason,
+    });
+    return result;
   }
   await ensureGrowthFiles(projectRoot);
   const state = await readGrowthState(projectRoot);
   const existing = state.candidates.find((item) => item.id === candidate.id);
   if (existing?.status === 'applied' || existing?.status === 'rejected') {
-    return { ok: true, action: 'growth-observe', skipped: true, reason: `candidate-${existing.status}`, candidate: existing };
+    const result = { ok: true, action: 'growth-observe', skipped: true, reason: `candidate-${existing.status}`, candidate: existing, autoApplied: false };
+    result.ledger = await syncGrowthLedger(projectRoot, {
+      action: 'observe',
+      outcome: `skipped-candidate-${existing.status}`,
+      candidateId: existing.id,
+      candidateType: existing.type,
+      scope: existing.scope,
+      reason: result.reason,
+    });
+    return result;
   }
   if (existing?.status === 'pending') {
     const autoApplyDecision = assessAutoApplyGrowthCandidate(existing, options.autoApply);
@@ -251,15 +441,27 @@ export async function observeGrowthWorkspace(projectRoot, rawCandidate = {}, opt
         mode: 'auto',
         reason: autoApplyDecision.reason,
       });
-      return {
+      const result = {
         ...applied,
         action: 'growth-observe',
         skipped: false,
         autoApplied: true,
         autoApplyDecision,
       };
+      result.ledger = await syncGrowthLedger(projectRoot, {
+        action: 'observe',
+        outcome: 'auto-applied',
+        candidateId: applied.candidate.id,
+        candidateType: applied.candidate.type,
+        scope: applied.candidate.scope,
+        autoApplied: true,
+        applyMode: 'auto',
+        reason: autoApplyDecision.reason,
+        changed: applied.changed,
+      });
+      return result;
     }
-    return {
+    const result = {
       ok: true,
       action: 'growth-observe',
       skipped: true,
@@ -268,6 +470,15 @@ export async function observeGrowthWorkspace(projectRoot, rawCandidate = {}, opt
       autoApplied: false,
       autoApplyDecision,
     };
+    result.ledger = await syncGrowthLedger(projectRoot, {
+      action: 'observe',
+      outcome: 'skipped-candidate-already-pending',
+      candidateId: existing.id,
+      candidateType: existing.type,
+      scope: existing.scope,
+      reason: autoApplyDecision.reason,
+    });
+    return result;
   }
   const stored = await writeCandidateEvent(projectRoot, candidate);
   const autoApplyDecision = assessAutoApplyGrowthCandidate(stored, options.autoApply);
@@ -276,15 +487,27 @@ export async function observeGrowthWorkspace(projectRoot, rawCandidate = {}, opt
       mode: 'auto',
       reason: autoApplyDecision.reason,
     });
-    return {
+    const result = {
       ...applied,
       action: 'growth-observe',
       skipped: false,
       autoApplied: true,
       autoApplyDecision,
     };
+    result.ledger = await syncGrowthLedger(projectRoot, {
+      action: 'observe',
+      outcome: 'auto-applied',
+      candidateId: applied.candidate.id,
+      candidateType: applied.candidate.type,
+      scope: applied.candidate.scope,
+      autoApplied: true,
+      applyMode: 'auto',
+      reason: autoApplyDecision.reason,
+      changed: applied.changed,
+    });
+    return result;
   }
-  return {
+  const result = {
     ok: true,
     action: 'growth-observe',
     skipped: false,
@@ -292,6 +515,15 @@ export async function observeGrowthWorkspace(projectRoot, rawCandidate = {}, opt
     autoApplied: false,
     autoApplyDecision,
   };
+  result.ledger = await syncGrowthLedger(projectRoot, {
+    action: 'observe',
+    outcome: 'pending-recorded',
+    candidateId: stored.id,
+    candidateType: stored.type,
+    scope: stored.scope,
+    reason: autoApplyDecision.reason,
+  });
+  return result;
 }
 
 export function assessAutoApplyGrowthCandidate(candidate, rawConfig = {}) {
@@ -364,6 +596,7 @@ async function applyGrowthCandidate(projectRoot, candidate, options = {}) {
 
 export async function reviewGrowthWorkspace(projectRoot) {
   const state = await readGrowthState(projectRoot);
+  const ledger = await syncGrowthLedger(projectRoot);
   const pending = state.candidates.filter((candidate) => candidate.status === 'pending');
   const benchmarkRecommendations = await listBenchmarkRecommendationsWorkspace(projectRoot).catch(() => []);
   return {
@@ -378,6 +611,7 @@ export async function reviewGrowthWorkspace(projectRoot) {
       applied: state.candidates.filter((candidate) => candidate.status === 'applied').length,
       rejected: state.candidates.filter((candidate) => candidate.status === 'rejected').length,
     },
+    ledger,
     benchmarkRecommendations,
     nextActions: [
       ...(pending.length === 0
@@ -465,7 +699,20 @@ export async function applyGrowthCandidateWorkspace(projectRoot, options = {}) {
   if (candidate.status !== 'pending') {
     return { ok: false, action: 'growth-apply', projectRoot, candidate, errors: [`Growth candidate is already ${candidate.status}.`] };
   }
-  return applyGrowthCandidate(projectRoot, candidate, { mode: 'manual' });
+  const result = await applyGrowthCandidate(projectRoot, candidate, { mode: 'manual' });
+  if (result.ok) {
+    result.ledger = await syncGrowthLedger(projectRoot, {
+      action: 'apply',
+      outcome: 'manual-applied',
+      candidateId: result.candidate.id,
+      candidateType: result.candidate.type,
+      scope: result.candidate.scope,
+      applyMode: 'manual',
+      reason: result.candidate.applyReason,
+      changed: result.changed,
+    });
+  }
+  return result;
 }
 
 export async function rejectGrowthCandidateWorkspace(projectRoot, options = {}) {
@@ -492,17 +739,27 @@ export async function rejectGrowthCandidateWorkspace(projectRoot, options = {}) 
   rejectedCandidates.push(stored);
   await writeJson(rejectedPath, { version: 1, candidates: rejectedCandidates });
 
-  return {
+  const result = {
     ok: true,
     action: 'growth-reject',
     projectRoot,
     candidate: stored,
     errors: [],
   };
+  result.ledger = await syncGrowthLedger(projectRoot, {
+    action: 'reject',
+    outcome: 'rejected',
+    candidateId: stored.id,
+    candidateType: stored.type,
+    scope: stored.scope,
+    reason: stored.notes,
+  });
+  return result;
 }
 
 export async function checkGrowthWorkspace(projectRoot) {
   const state = await readGrowthState(projectRoot);
+  const ledger = await syncGrowthLedger(projectRoot);
   const pending = state.candidates.filter((candidate) => candidate.status === 'pending');
   const applied = state.candidates.filter((candidate) => candidate.status === 'applied');
   const rejected = state.candidates.filter((candidate) => candidate.status === 'rejected');
@@ -518,6 +775,7 @@ export async function checkGrowthWorkspace(projectRoot) {
       applied: applied.length,
       rejected: rejected.length,
     },
+    ledger,
   };
 }
 

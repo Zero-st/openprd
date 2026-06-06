@@ -48,6 +48,7 @@ function humanText(value) {
 
 function gateDisplay(gate) {
   if (gate?.id === 'knowledge') return '经验沉淀';
+  if (gate?.id === 'growth') return '成长账本';
   return humanText(gate?.label ?? gate?.id ?? '测试块');
 }
 
@@ -98,7 +99,7 @@ function gateDescription(gate) {
   const descriptions = {
     smoke: '核心路径能否跑通，至少覆盖主流程和关键失败路径',
     'feature-coverage': '需求拆解项是否全部完成，验收点是否有对应回归',
-    'visual-review': '界面改动是否留下效果图对比或修改前后自检证据',
+    'visual-review': '界面改动是否留下效果图对比、局部焦点证据板、并行实验证据板或修改前后自检证据',
     'business-guardrails': '成本、额度、滥用、报警和止损是否讲清楚',
     'test-strategy': '本次需求该用哪几层测试、证据怎么留下、是否有豁免',
     traceability: '出问题时是否能追到用户动作、请求、任务和错误',
@@ -106,6 +107,7 @@ function gateDescription(gate) {
     'normal-performance': '普通规模下是否可用、不卡顿、不超时',
     'extreme-performance': '大数据、并发、异常输入或边界规模是否有兜底',
     knowledge: '本次问题是否需要沉淀经验，避免下次重复漏测',
+    growth: '本次收工是否留下成长账本事件，确保自动补齐和规则演进可观察',
   };
   return descriptions[gate.id] ?? '确认这项测试是否和本次需求相关，证据是否来自本次执行';
 }
@@ -530,6 +532,7 @@ function environmentItems(report) {
   const strategy = evalHarness.testStrategy ?? {};
   const obs = report.observability;
   const knowledge = report.knowledge;
+  const growth = report.growth ?? { summary: { eventCount: 0, completionCheckpoints: 0 } };
   const businessGuardrails = report.businessGuardrails;
   const visualReview = report.visualReview ?? { relevant: false, evidence: { present: false, summary: '当前场景未要求视觉评审证据' } };
   return [
@@ -563,7 +566,15 @@ function environmentItems(report) {
     },
     {
       summary: '经验沉淀',
-      detail: knowledge.skills.length > 0 ? `已有 ${knowledge.skills.length} 个项目经验` : '首次稳定问题修复后应沉淀经验',
+      detail: knowledge.skills.length > 0
+        ? `已有 ${knowledge.skills.length} 个项目经验${knowledge.candidates.length > 0 ? `，另有 ${knowledge.candidates.length} 个待确认草案` : ''}`
+        : (knowledge.candidates.length > 0 ? `已有 ${knowledge.candidates.length} 个待确认草案` : '首次稳定问题修复后应沉淀经验'),
+    },
+    {
+      summary: '成长账本',
+      detail: Number(growth.summary?.eventCount ?? 0) > 0
+        ? `已记录 ${growth.summary.eventCount} 条事件，completion checkpoint ${growth.summary.completionCheckpoints ?? 0} 条`
+        : '当前还没有成长账本事件；完成态至少应留下 checkpoint 或候选',
     },
   ];
 }

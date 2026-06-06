@@ -17,36 +17,31 @@
  * 维护规则
  * 变更评审或交接相关字段时，必须同步维护普通输出与 JSON 输出的一致性。
  */
+import { formatProductTypeDisplay } from '../product-type-copy.js';
+
 function printSynthesizeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
     return;
   }
 
-  console.log(`已合成 PRD 版本 ${result.snapshot.versionId}`);
+  console.log('已整理出一版可评审的需求稿');
   console.log(`标题: ${result.snapshot.title}`);
-  console.log(`产品类型: ${result.snapshot.productType ?? '未分类'}`);
-  console.log(`摘要指纹: ${result.snapshot.digest}`);
-  if (result.workUnitId) {
-    console.log(`工作单元: ${result.workUnitId}`);
-  }
+  console.log(`产品场景: ${formatProductTypeDisplay(result.snapshot.productType, { fallback: '待确认' })}`);
   if (!result.reviewPresentationRequired && (result.reviewPath ?? result.stableReviewArtifact)) {
-    console.log(`评审面板: ${result.reviewPath ?? result.stableReviewArtifact}`);
+    console.log('确认页面: 已生成');
   }
-  if (!result.reviewPresentationRequired && (result.reviewEntryPath ?? result.reviewArtifact)) {
-    console.log(`固定入口: ${result.reviewEntryPath ?? result.reviewArtifact}`);
-  }
-  console.log(`已打开评审面板: ${result.opened ? '是' : '否'}`);
+  console.log(`已自动打开确认页面: ${result.opened ? '是' : '否'}`);
   if (result.reviewPresentationRequired) {
-    console.log('评审面板: 尚未生成可确认页面');
-    console.log('下一步: 先运行 openprd review-presentation . --template，填写 presentation JSON 后运行 openprd review-presentation . --presentation <json> --write --fail-on-violation。');
+    console.log('确认页面: 还没到可以直接确认的状态');
+    console.log('下一步: 先把展示文案补齐，再重新生成确认页面。');
     const feedback = result.reviewPresentationGate?.violations ?? [];
     for (const item of feedback.slice(0, 6)) {
       const pathHint = item.jsonPath ? `${item.jsonPath}: ` : '';
       console.log(`- ${pathHint}${item.action}`);
     }
   } else if (result.reviewPath ?? result.stableReviewArtifact) {
-    console.log('请让用户先评审版本绑定的评审面板；用户确认后，使用页面复制出的带 version/digest/work-unit 的命令记录确认。');
+    console.log('请先让用户查看确认页面；用户认可后，再用页面提供的确认方式记录结果。');
   }
 }
 
@@ -71,17 +66,13 @@ function printReviewResult(result, json) {
     return;
   }
 
-  console.log(`PRD 评审状态: ${result.status}`);
-  console.log(`版本: ${result.versionId}`);
-  if (result.workUnitId) {
-    console.log(`工作单元: ${result.workUnitId}`);
-  }
-  console.log(`HTML 评审面板: ${result.reviewPath ?? result.stableReviewArtifact ?? result.reviewArtifact}`);
+  console.log(`确认结果: ${result.status}`);
+  console.log('确认页面: 已就绪');
   if (result.marked) {
-    console.log(`已从 ${result.previousStatus} 更新为 ${result.status}`);
+    console.log(`状态已从 ${result.previousStatus} 更新为 ${result.status}`);
   }
   if (result.opened) {
-    console.log('已打开评审面板');
+    console.log('已打开确认页面');
   }
 }
 
@@ -93,7 +84,7 @@ function printHistoryResult(result, json) {
 
   console.log(`版本历史: ${result.ws.workspaceRoot}`);
   for (const entry of result.versions) {
-    console.log(`- ${entry.versionId} | ${entry.title} | ${entry.productType ?? '未分类'} | ${entry.createdAt}`);
+    console.log(`- ${entry.versionId} | ${entry.title} | ${formatProductTypeDisplay(entry.productType, { fallback: '待确认' })} | ${entry.createdAt}`);
   }
 }
 
@@ -150,10 +141,8 @@ function printFreezeResult(result, json) {
     return;
   }
 
-  console.log(`已 freeze OpenPrd 工作区: ${result.ws.workspaceRoot}`);
-  console.log(`版本: ${result.snapshot.latestVersionId}`);
-  console.log(`Digest: ${result.snapshot.digest}`);
-  console.log(`状态文件: ${result.ws.paths.freezeState}`);
+  console.log('这版需求已经定稿，可以进入交接准备');
+  console.log(`定稿对象: ${result.snapshot.title ?? result.ws.workspaceRoot}`);
 }
 
 function printDiagramResult(result, json) {
@@ -187,13 +176,11 @@ function printHandoffResult(result, json) {
     return;
   }
 
-  console.log(`交接包已写入: ${result.exportDir}`);
-  console.log(`目标: ${result.handoff.target}`);
-  console.log(`版本: ${result.handoff.versionId}`);
-  if (result.handoff.projectVersion) {
-    console.log(`项目版本: ${result.handoff.projectVersion}`);
+  console.log('交接资料已经生成');
+  console.log(`交接去向: ${result.handoff.target}`);
+  if (result.handoff.nextStep) {
+    console.log(`建议下一步: ${result.handoff.nextStep}`);
   }
-  console.log(`Digest: ${result.handoff.digest}`);
 }
 
 export {

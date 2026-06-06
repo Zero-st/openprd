@@ -619,6 +619,24 @@ export function renderExperienceSkill({ skillName, source }) {
       source.eventNames.length > 0 ? `运行态再次出现事件：${source.eventNames.join(', ')}。` : null,
       source.symptoms.length > 0 ? `本次症状包括：${source.symptoms.join('；')}。` : null,
     ]
+  const applicability = [
+    source.abstractPattern ? `优先适用于：${source.abstractPattern}` : null,
+    source.kind === 'quality-report'
+      ? '适用于已经完成一轮实现，需要把质量闭环、证据顺序和防复发要求固定下来的任务。'
+      : '适用于已经拿到 runtime-events、timeline、root-cause-candidates 或 diagnostic-report 的排查任务。',
+  ]
+  const typicalInputs = [
+    source.title ? `问题摘要: ${source.title}` : null,
+    source.evidenceSources.length > 0
+      ? `可直接使用的证据: ${source.evidenceSources.slice(0, 4).map((item) => `${item.kind}:${item.path}`).join('；')}`
+      : null,
+    source.eventNames.length > 0 ? `关键事件: ${source.eventNames.join(' -> ')}` : null,
+  ]
+  const typicalOutputs = [
+    '结论性诊断说明，明确问题症状、根因模式和下一步动作。',
+    source.verificationSteps.length > 0 ? `最小验证链路: ${source.verificationSteps[0]}` : null,
+    '可复用的项目级 knowledge skill 或后续 candidate / incident / pattern 记录。',
+  ]
 
   return `---
 name: ${skillName}
@@ -630,6 +648,18 @@ description: 由 OpenPrd 从 ${source.kind} 自动沉淀的项目级排查经验
 ## 触发条件
 
 ${renderList(triggers, '当同类问题再次出现，先复用这套排查路径。')}
+
+## 适用范围
+
+${renderList(applicability, '适用于相似问题再次出现时，先复用已有排查路径和验证证据。')}
+
+## 典型输入
+
+${renderList(typicalInputs, '至少带上问题摘要、现有证据和关键事件。')}
+
+## 典型输出
+
+${renderList(typicalOutputs, '至少产出可复用结论、验证链路和后续知识沉淀。')}
 
 ## 先看哪些证据
 

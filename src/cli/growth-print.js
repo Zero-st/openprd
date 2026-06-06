@@ -95,6 +95,21 @@ function formatGrowthSuggestedPatch(patch) {
   return `${file} -> ${pathText} ${op}${value}`.trim();
 }
 
+function printGrowthLedger(ledger) {
+  if (!ledger?.summary) {
+    return;
+  }
+  const summary = ledger.summary;
+  console.log(`账本: events ${summary.eventCount ?? 0}，observe ${summary.observed}，pending ${summary.pendingObserved}，auto ${summary.autoApplied}，manual ${summary.manualApplied}，reconcile ${summary.reconciledAutoApplied}，checkpoint ${summary.completionCheckpoints ?? 0}，reject ${summary.rejected}，skip ${summary.skipped}`);
+  if (summary.current) {
+    console.log(`当前状态: ${summary.current.total} 个候选，${summary.current.pending} 待确认，${summary.current.applied} 已应用，${summary.current.rejected} 已拒绝`);
+  }
+  const skippedReasons = Object.entries(summary.skippedReasons ?? {});
+  if (skippedReasons.length > 0) {
+    console.log(`跳过原因: ${skippedReasons.map(([reason, count]) => `${reason}=${count}`).join('；')}`);
+  }
+}
+
 function printGrowthResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -104,6 +119,7 @@ function printGrowthResult(result, json) {
   if (result.action === 'growth-init') {
     console.log('OpenPrd growth: 已初始化');
     console.log(`候选队列: ${result.files.candidates}`);
+    printGrowthLedger(result.ledger);
     return;
   }
 
@@ -111,6 +127,7 @@ function printGrowthResult(result, json) {
   if (result.summary) {
     console.log(`候选: ${result.summary.pending} 待确认，${result.summary.applied} 已应用，${result.summary.rejected} 已拒绝。`);
   }
+  printGrowthLedger(result.ledger);
   const candidates = result.pending ?? (result.candidate ? [result.candidate] : []);
   for (const candidate of candidates) {
     console.log(`- ${candidate.id}: ${candidate.title}`);

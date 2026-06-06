@@ -270,6 +270,8 @@ test('clarify returns user questions and capture writes answers into state', asy
 
   const clarify = await clarifyWorkspace(project, {});
   assert.ok(clarify.clarification.mustAskUser.length > 0);
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('先整理需求摘要给你确认')));
+  assert.equal(clarify.inlineClarification.lines.some((line) => line.includes('确认执行')), false);
 
   const captured = await captureWorkspace(project, {
     field: 'problem.problemStatement',

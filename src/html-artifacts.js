@@ -1190,8 +1190,7 @@ function reviewCopyBundle({ label, command, payload, message = null }) {
 }
 
 function reviewContinueMessage(snapshot) {
-  const reviewLabel = snapshot?.versionId ? `当前稳定评审稿 ${snapshot.versionId}` : '当前稳定评审稿';
-  return `${reviewLabel}已确认。请先记录这版稳定评审稿，并继续当前 OpenPrd 下一步。若 review 后 tasks 已就绪但还需要执行授权，请直接展示执行确认清单，不要再泛泛确认。`;
+  return '这版需求确认稿已经通过。请先记录这次确认结果，并继续推进后续落地内容。只有后面确实需要额外授权时，再用人话说明影响和下一步。';
 }
 
 function shellQuote(value) {

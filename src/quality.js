@@ -13,6 +13,7 @@ import {
   listVisualReviewArtifacts,
 } from './quality-visual-review.js';
 import {
+  buildKnowledgeAdoptionSummary,
   deriveKnowledgeNames,
   ensureKnowledgeWorkspace,
   listKnowledgeCandidates,
@@ -23,6 +24,10 @@ import {
   recordKnowledgeReviewSignal,
   reviewKnowledgeWorkspace,
 } from './knowledge.js';
+import {
+  OPENPRD_GROWTH_LEDGER,
+  recordGrowthCheckpointWorkspace,
+} from './growth.js';
 import { timestamp } from './time.js';
 
 const QUALITY_DIR = cjoin('.openprd', 'quality');
@@ -91,6 +96,7 @@ const QUALITY_GATE_IDS = [
   'normal-performance',
   'extreme-performance',
   'knowledge',
+  'growth',
 ];
 
 const EVIDENCE_EXTENSIONS = new Set(['.json', '.md', '.txt', '.log', '.xml', '.html', '.csv']);
@@ -102,10 +108,11 @@ const EVIDENCE_TOKENS = {
   'test-strategy': ['test-layer', 'test-size', 'test-scope', 'evidence-plan', 'testing pyramid', '测试策略', '测试分流', '单元测试', '集成测试', '端到端'],
   smoke: ['smoke', 'e2e', 'playwright', 'cypress', 'main flow', 'happy path', '冒烟', '主流程'],
   'feature-coverage': ['feature coverage', 'acceptance', 'tasks done', 'openprd tasks', '验收', '功能覆盖', '任务完成'],
-  'visual-review': ['visual-compare', 'visual-before-after', 'reference-actual', 'before-after', '效果图', '实现截图', '修改前', '修改后', '视觉对比'],
+  'visual-review': ['visual-compare', 'visual-before-after', 'visual-focus-board', 'visual-parallel-board', 'reference-actual', 'before-after', 'focus-board', 'parallel-board', '效果图', '实现截图', '修改前', '修改后', '视觉对比', '局部焦点证据板', '并行实验证据板'],
   'normal-performance': ['performance', 'perf', 'benchmark', 'latency', 'p95', 'lighthouse', 'k6', '性能', '耗时'],
   'extreme-performance': ['extreme', 'stress', 'load test', 'large-data', 'pressure', 'k6', '压力', '极端', '大数据'],
   knowledge: ['quality learn', 'incident', 'pattern', 'skill', '复盘', '经验', '沉淀'],
+  growth: ['growth ledger', 'completion checkpoint', 'openprd grow', 'workflow-gotcha', 'code-extension', '自我成长', '账本', '候选'],
 };
 
 function qualityPath(projectRoot, relativePath) {
@@ -234,6 +241,11 @@ function defaultQualityConfig() {
       draftDir: '.openprd/knowledge/drafts',
       abstractionRequired: true,
     },
+    growth: {
+      enabled: true,
+      ledgerPath: OPENPRD_GROWTH_LEDGER,
+      completionCheckpointRequired: true,
+    },
   };
 }
 
@@ -277,6 +289,10 @@ function normalizeQualityConfig(config = {}) {
     knowledge: {
       ...defaults.knowledge,
       ...(config.knowledge ?? {}),
+    },
+    growth: {
+      ...defaults.growth,
+      ...(config.growth ?? {}),
     },
   };
 }
@@ -496,7 +512,32 @@ function detectScenarioTags({ activeChangeContext, activeTasks, businessGuardrai
   return [...tags];
 }
 
-function buildQualityPolicy({ config, activeChangeContext, activeTasks, businessGuardrails }) {
+function isSubstantiveCompletionFile(relativePath) {
+  const normalized = String(relativePath ?? '').split(path.sep).join('/');
+  if (!normalized) {
+    return false;
+  }
+  if (/^(src|app|lib|server|scripts|test|tests|templates)\//.test(normalized)) {
+    return true;
+  }
+  return ['package.json', 'README.md', 'AGENTS.md'].includes(normalized);
+}
+
+function detectCompletionState({ files, activeTasks, evidenceFiles }) {
+  const substantiveFiles = files.filter((file) => isSubstantiveCompletionFile(file.path));
+  const hasEvidence = evidenceFiles.length > 0;
+  const activeTaskLedgerSettled = !activeTasks.activeChange || Number(activeTasks.pending ?? 0) === 0;
+  const postCompletionRequired = substantiveFiles.length > 0 && hasEvidence && activeTaskLedgerSettled;
+  return {
+    postCompletionRequired,
+    substantiveFiles: substantiveFiles.slice(0, 12).map((file) => file.path),
+    substantiveFileCount: substantiveFiles.length,
+    activeTaskLedgerSettled,
+    hasEvidence,
+  };
+}
+
+function buildQualityPolicy({ config, activeChangeContext, activeTasks, businessGuardrails, completionState }) {
   const scenarioTags = detectScenarioTags({ activeChangeContext, activeTasks, businessGuardrails });
   const profiles = config.evalHarness.scenarioProfiles ?? defaultQualityConfig().evalHarness.scenarioProfiles;
   const required = new Set();
@@ -523,6 +564,14 @@ function buildQualityPolicy({ config, activeChangeContext, activeTasks, business
   if (!config.knowledge.enabled) {
     required.delete('knowledge');
   }
+  if (completionState?.postCompletionRequired) {
+    if (config.knowledge.enabled) {
+      required.add('knowledge');
+    }
+    if (config.growth?.enabled && config.growth?.completionCheckpointRequired !== false) {
+      required.add('growth');
+    }
+  }
   return {
     scenarioTags,
     requiredGates: QUALITY_GATE_IDS.filter((gate) => required.has(gate)),
@@ -531,7 +580,7 @@ function buildQualityPolicy({ config, activeChangeContext, activeTasks, business
   };
 }
 
-function buildEvidenceLedger({ evidenceFiles, activeTasks, observability, businessGuardrails, knowledge, visualReview }) {
+function buildEvidenceLedger({ evidenceFiles, activeTasks, observability, businessGuardrails, knowledge, growth, visualReview }) {
   const ledger = Object.fromEntries(QUALITY_GATE_IDS.map((gate) => {
     const tokens = EVIDENCE_TOKENS[gate] ?? [];
     const matches = evidenceFiles
@@ -592,8 +641,8 @@ function buildEvidenceLedger({ evidenceFiles, activeTasks, observability, busine
         ...knowledge.candidates.slice(0, 3).map((candidate) => ({ path: candidate, source: 'openprd-knowledge-candidate' })),
       ].slice(0, 12),
       summary: knowledge.candidates.length > 0
-        ? `已有 ${knowledge.skills.length} 个项目经验 Skill，另有 ${knowledge.candidates.length} 个待确认 candidate`
-        : `已有 ${knowledge.skills.length} 个项目经验 Skill`,
+        ? `已有 ${knowledge.skills.length} 个项目经验 Skill，命中 ${knowledge.adoption?.totals?.hit ?? 0} / 引用 ${knowledge.adoption?.totals?.referenced ?? 0} / 注入 ${knowledge.adoption?.totals?.injected ?? 0}，另有 ${knowledge.candidates.length} 个待确认 candidate`
+        : `已有 ${knowledge.skills.length} 个项目经验 Skill，命中 ${knowledge.adoption?.totals?.hit ?? 0} / 引用 ${knowledge.adoption?.totals?.referenced ?? 0} / 注入 ${knowledge.adoption?.totals?.injected ?? 0}`,
     };
   } else if (knowledge.candidates.length > 0) {
     ledger.knowledge = {
@@ -605,6 +654,21 @@ function buildEvidenceLedger({ evidenceFiles, activeTasks, observability, busine
       ].slice(0, 12),
       summary: `已有 ${knowledge.candidates.length} 个待确认 knowledge candidate`,
     };
+  }
+  if (growth?.summary) {
+    const lifecycleCount = Number(growth.summary.lifecycleCount ?? 0);
+    const completionCheckpoints = Number(growth.summary.completionCheckpoints ?? 0);
+    if (lifecycleCount > 0 || completionCheckpoints > 0) {
+      ledger.growth = {
+        ...ledger.growth,
+        present: true,
+        sources: [
+          ...ledger.growth.sources,
+          { path: growth.ledgerPath ?? OPENPRD_GROWTH_LEDGER, source: 'openprd-growth-ledger' },
+        ].slice(0, 12),
+        summary: `growth 账本已有 ${growth.summary.eventCount ?? 0} 条事件，其中 completion checkpoint ${completionCheckpoints} 条`,
+      };
+    }
   }
   if (visualReview?.evidence) {
     ledger['visual-review'] = {
@@ -923,7 +987,7 @@ async function listKnowledgeFiles(projectRoot) {
   return collected;
 }
 
-function detectKnowledge({ config, knowledgeFiles, candidateState }) {
+function detectKnowledge({ config, knowledgeFiles, candidateState, knowledgeIndex, completionState }) {
   const skillDir = config.knowledge.skillDir ?? '.openprd/knowledge/skills';
   const candidateDir = config.knowledge.candidateDir ?? KNOWLEDGE_CANDIDATES_DIR;
   const draftDir = config.knowledge.draftDir ?? KNOWLEDGE_DRAFTS_DIR;
@@ -942,15 +1006,23 @@ function detectKnowledge({ config, knowledgeFiles, candidateState }) {
     .filter((file) => file.path.endsWith('SKILL.md'))
     .map((file) => file.path);
   const incidents = knowledgeFiles.filter((file) => /\.openprd[\\/]knowledge[\\/]incidents[\\/].+\.json$/.test(file.path));
+  const adoption = buildKnowledgeAdoptionSummary(Array.isArray(knowledgeIndex?.skills) ? knowledgeIndex.skills : []);
   const warnings = [];
-  if (config.knowledge.enabled && skills.length === 0) {
+  const hasReusableArtifact = skills.length > 0 || pendingCandidates.length > 0 || Number(candidateState?.counts?.total ?? 0) > 0;
+  if (config.knowledge.enabled && skills.length === 0 && !hasReusableArtifact) {
     warnings.push('项目级经验 skill 库尚为空；首次问题修复后应沉淀抽象经验。');
   }
   if (config.knowledge.enabled && pendingCandidates.length > 0) {
     warnings.push(`当前有 ${pendingCandidates.length} 个待确认 knowledge candidate；本轮收工前应决定 promote、reject 或 archive。`);
   }
+  if (config.knowledge.enabled && completionState?.postCompletionRequired && !hasReusableArtifact) {
+    warnings.push('本次已经达到可交付状态，但还没有自动生成 knowledge candidate；收工前至少保留一条可审查的项目经验草案。');
+  }
+  if (config.knowledge.enabled && skills.length > 0 && adoption.totals.referenced === 0) {
+    warnings.push('项目级经验 skill 已产出，但还没有任何 run-context 引用记录；优先接入自动命中与注入链路。');
+  }
   return {
-    status: !config.knowledge.enabled || skills.length > 0 ? 'pass' : 'needs-attention',
+    status: !config.knowledge.enabled || hasReusableArtifact ? 'pass' : 'needs-attention',
     enabled: config.knowledge.enabled,
     skillDir,
     candidateDir,
@@ -969,6 +1041,7 @@ function detectKnowledge({ config, knowledgeFiles, candidateState }) {
     },
     reviewedCandidates,
     candidateDetails: candidateState?.candidates ?? [],
+    adoption,
     drafts,
     incidents: incidents.map((file) => file.path),
     recommendations: [
@@ -976,6 +1049,39 @@ function detectKnowledge({ config, knowledgeFiles, candidateState }) {
       '只有重复、高影响、隐性知识或 Agent 误判类问题才升级为项目级 skill。',
       '生成 skill 时按抽象模式写触发条件和验证步骤，避免只记录一次性事故流水账。',
     ],
+    warnings,
+  };
+}
+
+function detectGrowth({ config, growthLedger, completionState }) {
+  const summary = growthLedger?.summary ?? {};
+  const lifecycleCount = Number(summary.observed ?? 0)
+    + Number(summary.manualApplied ?? 0)
+    + Number(summary.autoApplied ?? 0)
+    + Number(summary.reconciledAutoApplied ?? 0)
+    + Number(summary.rejected ?? 0)
+    + Number(summary.skipped ?? 0);
+  const completionCheckpoints = Number(summary.completionCheckpoints ?? 0);
+  const eventCount = Number(summary.eventCount ?? 0);
+  const warnings = [];
+  if (config.growth?.enabled && completionState?.postCompletionRequired && completionCheckpoints === 0 && lifecycleCount === 0) {
+    warnings.push('本次已经达到可交付状态，但 .openprd/growth 还没有任何收工账本记录；至少补一条 completion checkpoint 或 growth 观察事件。');
+  }
+  if (config.growth?.enabled && completionState?.postCompletionRequired && completionCheckpoints > 0 && lifecycleCount === 0) {
+    warnings.push('已记录完成检查点，但还没有新增 growth candidate；如果本轮形成了新的偏好、规则或工作流经验，收工前补一条 observe。');
+  }
+  return {
+    status: !config.growth?.enabled || !completionState?.postCompletionRequired || completionCheckpoints > 0 || lifecycleCount > 0
+      ? 'pass'
+      : 'needs-attention',
+    enabled: config.growth?.enabled !== false,
+    ledgerPath: config.growth?.ledgerPath ?? OPENPRD_GROWTH_LEDGER,
+    summary: {
+      eventCount,
+      lifecycleCount,
+      completionCheckpoints,
+      current: summary.current ?? { total: 0, pending: 0, applied: 0, rejected: 0 },
+    },
     warnings,
   };
 }
@@ -1003,7 +1109,7 @@ function buildGate({ id, label, baseStatus, baseWarnings, policy, evidenceLedger
   };
 }
 
-function buildGates({ observability, evalHarness, businessGuardrails, knowledge, visualReview, policy, evidenceLedger }) {
+function buildGates({ observability, evalHarness, businessGuardrails, knowledge, growth, visualReview, policy, evidenceLedger }) {
   return [
     buildGate({
       id: 'traceability',
@@ -1087,6 +1193,14 @@ function buildGates({ observability, evalHarness, businessGuardrails, knowledge,
       policy,
       evidenceLedger,
     }),
+    buildGate({
+      id: 'growth',
+      label: '自我成长账本',
+      baseStatus: growth.status,
+      baseWarnings: growth.warnings,
+      policy,
+      evidenceLedger,
+    }),
   ];
 }
 
@@ -1094,8 +1208,8 @@ async function loadPackageJson(projectRoot) {
   return readJson(cjoin(projectRoot, 'package.json')).catch(() => null);
 }
 
-async function buildQualityReport(projectRoot, config) {
-  const id = reportId();
+async function buildQualityReport(projectRoot, config, options = {}) {
+  const id = options.reportId ?? reportId();
   const normalizedConfig = normalizeQualityConfig(config);
   const files = await walkProject(projectRoot);
   const texts = await readProjectTexts(projectRoot, files);
@@ -1105,21 +1219,25 @@ async function buildQualityReport(projectRoot, config) {
   const evidenceFiles = await readEvidenceFiles(projectRoot, normalizedConfig);
   const visualArtifacts = await listVisualReviewArtifacts(projectRoot);
   const knowledgeFiles = await listKnowledgeFiles(projectRoot);
+  const knowledgeIndex = await readJson(qualityPath(projectRoot, KNOWLEDGE_INDEX)).catch(() => ({ version: 1, skills: [] }));
+  const growthLedger = await readJson(qualityPath(projectRoot, normalizedConfig.growth?.ledgerPath ?? OPENPRD_GROWTH_LEDGER)).catch(() => null);
+  const completionState = detectCompletionState({ files, activeTasks, evidenceFiles });
   const observability = detectObservability({ config: normalizedConfig, files, texts, packageJson });
   const evalHarness = detectEvalHarness({ config: normalizedConfig, files, texts, packageJson, activeTasks });
   const businessGuardrails = detectBusinessGuardrails({ config: normalizedConfig, files, texts, packageJson });
   const candidateState = await listKnowledgeCandidates(projectRoot, { status: 'all' }).catch(() => null);
-  const knowledge = detectKnowledge({ config: normalizedConfig, knowledgeFiles, candidateState });
-  const policy = buildQualityPolicy({ config: normalizedConfig, activeChangeContext, activeTasks, businessGuardrails });
+  const knowledge = detectKnowledge({ config: normalizedConfig, knowledgeFiles, candidateState, knowledgeIndex, completionState });
+  const growth = detectGrowth({ config: normalizedConfig, growthLedger, completionState });
+  const policy = buildQualityPolicy({ config: normalizedConfig, activeChangeContext, activeTasks, businessGuardrails, completionState });
   const visualReview = detectVisualReview({ policy, activeChangeContext, activeTasks, visualArtifacts, includesAny });
-  const evidenceLedger = buildEvidenceLedger({ evidenceFiles, activeTasks, observability, businessGuardrails, knowledge, visualReview });
-  const gates = buildGates({ observability, evalHarness, businessGuardrails, knowledge, visualReview, policy, evidenceLedger });
+  const evidenceLedger = buildEvidenceLedger({ evidenceFiles, activeTasks, observability, businessGuardrails, knowledge, growth, visualReview });
+  const gates = buildGates({ observability, evalHarness, businessGuardrails, knowledge, growth, visualReview, policy, evidenceLedger });
   const blockingStatuses = new Set(['fail']);
   const attentionStatuses = new Set(['needs-attention', 'needs-evidence']);
   const readiness = {
     ok: !gates.some((gate) => blockingStatuses.has(gate.status)),
     productionReady: !gates.some((gate) => attentionStatuses.has(gate.status) || blockingStatuses.has(gate.status)),
-    enforcement: config.enforcement,
+    enforcement: normalizedConfig.enforcement,
     failingGates: gates.filter((gate) => blockingStatuses.has(gate.status)).map((gate) => gate.id),
     attentionGates: gates.filter((gate) => attentionStatuses.has(gate.status)).map((gate) => gate.id),
   };
@@ -1149,6 +1267,8 @@ async function buildQualityReport(projectRoot, config) {
     businessGuardrails,
     visualReview,
     knowledge,
+    growth,
+    completionState,
     configSnapshot: normalizedConfig,
   };
 }
@@ -1217,29 +1337,68 @@ export async function verifyQualityWorkspace(projectRoot, options = {}) {
   }
   const config = normalizeQualityConfig(await readJson(configPath));
   await ensureQualityDirs(projectRoot);
-  const report = await buildQualityReport(projectRoot, config);
-  const paths = await writeReport(projectRoot, report);
+  const initialReport = await buildQualityReport(projectRoot, config);
+  let report = initialReport;
+  let paths = await writeReport(projectRoot, report);
   const knowledgeSignal = {
     kind: 'quality-verify',
     ok: report.readiness.productionReady,
     productionReady: report.readiness.productionReady,
     attentionGates: report.readiness.attentionGates,
+    touchedFiles: report.completionState?.substantiveFiles ?? [],
     summary: `quality ${report.summary.status}`,
   };
   await recordKnowledgeReviewSignal(projectRoot, knowledgeSignal).catch(() => null);
+  const growthCheckpoint = report.completionState?.postCompletionRequired && config.growth?.enabled !== false
+    ? await recordGrowthCheckpointWorkspace(projectRoot, {
+      outcome: 'quality-verify',
+      reason: report.evalHarness?.featureCoverage?.activeTasks?.activeChange
+        ?? report.completionState?.substantiveFiles?.slice(0, 4).join('|')
+        ?? 'quality-post-completion',
+      changed: report.completionState?.substantiveFiles ?? [],
+    }).catch((error) => ({
+      ok: false,
+      action: 'growth-checkpoint',
+      projectRoot,
+      recorded: false,
+      errors: [error instanceof Error ? error.message : String(error)],
+    }))
+    : {
+      ok: true,
+      action: 'growth-checkpoint',
+      projectRoot,
+      recorded: false,
+      skipped: true,
+      reason: 'completion-checkpoint-not-required',
+    };
   const reviewSource = (await exists(qualityPath(projectRoot, OPENPRD_HARNESS_TURN_STATE)))
     ? OPENPRD_HARNESS_TURN_STATE
     : paths.jsonPath;
-  const knowledgeReview = await reviewKnowledgeWorkspace(projectRoot, {
-    from: reviewSource,
-    signal: knowledgeSignal,
-    requiredCorrelationFields: config.observability.requiredCorrelationFields,
-  }).catch((error) => ({
-    ok: false,
-    action: 'quality-knowledge-review',
-    skipped: false,
-    errors: [error instanceof Error ? error.message : String(error)],
-  }));
+  const shouldAutoReviewKnowledge = Boolean(
+    report.completionState?.postCompletionRequired
+      && (report.knowledge?.skills?.length ?? 0) === 0
+      && Number(report.knowledge?.candidateCounts?.total ?? 0) === 0
+  );
+  const knowledgeReview = shouldAutoReviewKnowledge
+    ? await reviewKnowledgeWorkspace(projectRoot, {
+      from: reviewSource,
+      signal: knowledgeSignal,
+      touchedFiles: report.completionState?.substantiveFiles ?? [],
+      requiredCorrelationFields: config.observability.requiredCorrelationFields,
+    }).catch((error) => ({
+      ok: false,
+      action: 'quality-knowledge-review',
+      skipped: false,
+      errors: [error instanceof Error ? error.message : String(error)],
+    }))
+    : {
+      ok: true,
+      action: 'quality-knowledge-review',
+      skipped: true,
+      reason: 'reusable-knowledge-artifact-already-exists',
+    };
+  report = await buildQualityReport(projectRoot, config, { reportId: initialReport.id });
+  paths = await writeReport(projectRoot, report);
   const strict = options.strict === true;
   const blocking = (strict || config.enforcement === 'blocking') && !report.readiness.productionReady;
   const featureCoverageOnly = report.readiness.failingGates.length === 0
@@ -1253,6 +1412,7 @@ export async function verifyQualityWorkspace(projectRoot, options = {}) {
     reportPath: paths.jsonPath,
     htmlPath: paths.htmlPath,
     indexPath: paths.indexPath,
+    growthCheckpoint,
     knowledgeReview,
     errors: blocking
       ? [

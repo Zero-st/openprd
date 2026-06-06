@@ -355,9 +355,9 @@ function renderArrow(def) {
 }
 
 function resolveProductLayerTitle(productType) {
-  if (productType === 'consumer') return '消费端体验层';
-  if (productType === 'b2b') return 'B2B 工作流层';
-  if (productType === 'agent') return 'Agent 运行层';
+  if (productType === 'consumer') return '个人消费者场景层';
+  if (productType === 'b2b') return '企业服务场景层';
+  if (productType === 'agent') return 'Agent 使用场景层';
   return '产品体验层';
 }
 
@@ -556,7 +556,7 @@ export function renderArchitectureDiagramHtml(model) {
     svgMarkup,
     summaryCards: model.summaryCards,
     sidePanels: model.sidePanels,
-    footer: `负责人: ${model.metadata.owner} · 版本: ${model.metadata.versionId} · 目标: ${model.metadata.targetSystem} · 生成时间: ${model.generatedAt}`,
+    footer: `负责人: ${model.metadata.owner} · 交接去向: ${model.metadata.targetSystem} · 最近生成: ${model.generatedAt}`,
   });
 }
 
@@ -752,7 +752,7 @@ export function renderProductFlowDiagramHtml(model) {
     svgMarkup,
     summaryCards: model.summaryCards,
     sidePanels: model.sidePanels,
-    footer: `负责人: ${model.metadata.owner} · 版本: ${model.metadata.versionId} · 目标: ${model.metadata.targetSystem} · 生成时间: ${model.generatedAt}`,
+    footer: `负责人: ${model.metadata.owner} · 交接去向: ${model.metadata.targetSystem} · 最近生成: ${model.generatedAt}`,
   });
 }
 

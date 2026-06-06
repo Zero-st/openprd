@@ -2,7 +2,7 @@
   "version": 1,
   "enabled": true,
   "strategy": "semver",
-  "currentVersion": "0.1.7",
+  "currentVersion": "0.1.8",
   "versions": [
     {
       "version": "0.1.2",
@@ -265,9 +265,9 @@
     },
     {
       "version": "0.1.7",
-      "status": "current",
+      "status": "released",
       "createdAt": "2026-06-05 17:33:02",
-      "updatedAt": "2026-06-05 17:33:16",
+      "updatedAt": "2026-06-06 14:06:15",
       "notes": null,
       "items": [
         {
@@ -283,8 +283,62 @@
         }
       ],
       "tag": null
+    },
+    {
+      "version": "0.1.8",
+      "status": "current",
+      "createdAt": "2026-06-06 14:06:15",
+      "updatedAt": "2026-06-06 14:06:53",
+      "notes": null,
+      "items": [
+        {
+          "type": "新增",
+          "summary": "新增",
+          "detail": "命中的项目经验会自动进入运行上下文和执行引导，减少重复补充规则",
+          "sentence": "新增：命中的项目经验会自动进入运行上下文和执行引导，减少重复补充规则",
+          "recordedAt": "2026-06-06 14:06:26",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780725986925"
+          }
+        },
+        {
+          "type": "修复",
+          "summary": "修复",
+          "detail": "用户已经认可后，后续默认直接继续推进，不再重复追问同一轮确认",
+          "sentence": "修复：用户已经认可后，后续默认直接继续推进，不再重复追问同一轮确认",
+          "recordedAt": "2026-06-06 14:06:27",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780725987012"
+          }
+        },
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "对外文案统一改成更好懂的表达，减少内部术语直接暴露给用户",
+          "sentence": "优化：对外文案统一改成更好懂的表达，减少内部术语直接暴露给用户",
+          "recordedAt": "2026-06-06 14:06:27",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780725987036"
+          }
+        },
+        {
+          "type": "新增",
+          "summary": "新增",
+          "detail": "项目经验命中、引用和注入会留下采用记录，方便判断自我成长有没有真的生效",
+          "sentence": "新增：项目经验命中、引用和注入会留下采用记录，方便判断自我成长有没有真的生效",
+          "recordedAt": "2026-06-06 14:06:53",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780726013537"
+          }
+        }
+      ],
+      "tag": null
     }
   ],
   "createdAt": "2026-06-02 21:28:04",
-  "updatedAt": "2026-06-05 09:33:26"
+  "updatedAt": "2026-06-06 14:06:53"
 }

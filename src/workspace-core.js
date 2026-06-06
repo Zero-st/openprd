@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { buildSnapshotChangeSummary } from './change-summary.js';
+import { formatProductTypeDisplay, formatTemplatePackDisplay } from './product-type-copy.js';
 import { buildDiagramArtifact, renderDiagramMermaidFromModel } from './diagram-core.js';
 import { analyzePrdSnapshot, buildPrdSnapshot, formatVersionId, getRequiredFieldDescriptors, renderPrdMarkdown, summarizeSnapshot } from './prd-core.js';
 import { normalizeReleaseLedger } from './release-ledger.js';
@@ -1984,7 +1985,7 @@ function renderHandoffDoc(snapshot) {
   const summarySection = changeSummary.markdown
     ? `\n## 变化摘要\n\n${changeSummary.markdown}\n`
     : '';
-  return `# 交接\n\n- 版本: ${snapshot.versionId}\n- 产品类型: ${snapshot.productType ?? '未分类'}\n- 模板包: ${snapshot.templatePack}\n- Digest: ${snapshot.digest}\n- 负责人: ${handoff.owner}\n- 下一步: ${handoff.nextStep}\n- 目标系统: ${handoff.targetSystem}\n${summarySection}`;
+  return `# 交接\n\n- 本次内容: ${snapshot.title}\n- 产品场景: ${formatProductTypeDisplay(snapshot.productType, { fallback: '待确认' })}\n- 场景模板: ${formatTemplatePackDisplay(snapshot.templatePack, { fallback: '待确认' })}\n- 负责人: ${handoff.owner}\n- 下一步: ${handoff.nextStep}\n- 交接去向: ${handoff.targetSystem}\n${summarySection}`;
 }
 
 

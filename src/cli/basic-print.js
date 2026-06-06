@@ -17,6 +17,7 @@
  * 维护规则
  * 新增基础工作流结果字段时同步更新文本输出与 JSON 可读性，保持对外提示风格一致。
  */
+import { formatProductTypeDisplay, formatTemplatePackDisplay } from '../product-type-copy.js';
 import { printOptionalCapabilitySuggestions } from './shared-print.js';
 
 function resolveActiveTemplatePack(ws) {
@@ -95,8 +96,8 @@ function printStatus(ws, report, guidance, json) {
 
   console.log(`工作区: ${summary.workspaceRoot}`);
   console.log(`Schema: ${summary.schema}`);
-  console.log(`模板包: ${summary.templatePack}`);
-  console.log(`产品类型: ${summary.productTypes.join(', ')}`);
+  console.log(`场景模板: ${formatTemplatePackDisplay(summary.templatePack, { fallback: '待确认' })}`);
+  console.log(`支持的产品场景: ${summary.productTypes.length > 0 ? summary.productTypes.map((type) => formatProductTypeDisplay(type, { fallback: type })).join(' / ') : '待确认'}`);
   console.log(`PRD 版本: ${summary.prdVersion}`);
   console.log(`最新版本: ${summary.latestVersionId ?? '无'}`);
   console.log(`版本数量: ${summary.versionCount}`);
@@ -190,8 +191,8 @@ function printClassifyResult(result, json) {
     return;
   }
 
-  console.log(`已分类产品类型: ${result.currentState.productType}`);
-  console.log(`模板包: ${result.currentState.templatePack}`);
+  console.log(`已锁定产品场景: ${formatProductTypeDisplay(result.currentState.productType, { fallback: '待确认' })}`);
+  console.log(`场景模板: ${formatTemplatePackDisplay(result.currentState.templatePack, { fallback: '待确认' })}`);
 }
 
 function printClarifyResult(result, json) {
@@ -336,7 +337,7 @@ function printInitResult(result, json) {
   }
 
   console.log(`已初始化 OpenPrd 工作区: ${result.ws.workspaceRoot}`);
-  console.log(`模板包: ${result.currentState.templatePack}`);
+  console.log(`场景模板: ${formatTemplatePackDisplay(result.currentState.templatePack, { fallback: '待确认' })}`);
   console.log(`已复制种子文件: ${result.created}`);
   if (result.standards) {
     console.log(`标准化文档: ${result.standards.docsRoot}`);

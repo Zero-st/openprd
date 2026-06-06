@@ -246,13 +246,30 @@ function printVisualCompareResult(result, json) {
     return;
   }
 
+  const modeLabel = result.mode === 'before-after'
+    ? '修改前后自检'
+    : result.mode === 'focus-board'
+      ? '局部焦点证据板'
+      : result.mode === 'parallel-board'
+        ? '并行实验证据板'
+        : '效果图对比';
   console.log('OpenPrd visual compare: 已生成');
   console.log(`输出图片: ${result.outputPath}`);
-  console.log(`模式: ${result.mode === 'before-after' ? '修改前后自检' : '效果图对比'}`);
+  console.log(`模式: ${modeLabel}`);
   console.log(`格式: ${result.format}${result.quality ? `, quality=${result.quality}` : ''}`);
   console.log(`画布: ${result.canvas.width}x${result.canvas.height}`);
-  console.log(`左侧: ${result.labels.reference} (${result.reference.rendered.width}x${result.reference.rendered.height})`);
-  console.log(`右侧: ${result.labels.actual} (${result.actual.rendered.width}x${result.actual.rendered.height})`);
+  if (result.labels?.reference && result.reference?.rendered) {
+    console.log(`左侧: ${result.labels.reference} (${result.reference.rendered.width}x${result.reference.rendered.height})`);
+  }
+  if (result.labels?.actual && result.actual?.rendered) {
+    console.log(`右侧: ${result.labels.actual} (${result.actual.rendered.width}x${result.actual.rendered.height})`);
+  }
+  if (Array.isArray(result.focusRegions) && result.focusRegions.length > 0) {
+    console.log(`焦点区域: ${result.focusRegions.length}`);
+  }
+  if (Array.isArray(result.items) && result.items.length > 0) {
+    console.log(`实验卡片: ${result.items.length}`);
+  }
   for (const action of result.nextActions ?? []) {
     console.log(`- 下一步: ${action}`);
   }

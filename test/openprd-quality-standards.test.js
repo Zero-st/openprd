@@ -95,6 +95,11 @@ import {
   synthesizeWorkspace,
   writeMinimalChange,
 } from './helpers/openprd-test-helpers.js';
+import {
+  detectVisualReview,
+  listVisualReviewArtifacts,
+} from '../src/quality-visual-review.js';
+
 test('quality verify writes html eval report and learn creates experience skill', async () => {
   const project = await makeTempProject();
   await initWorkspace(project, { templatePack: 'agent' });
@@ -136,8 +141,13 @@ test('quality verify writes html eval report and learn creates experience skill'
   assert.equal(quality.report.evalHarness.smoke.present, true);
   assert.equal(quality.report.evalHarness.performance.present, true);
   assert.equal(quality.report.evalHarness.extremeData.present, true);
-  assert.deepEqual(quality.report.qualityPolicy.requiredGates, ['smoke', 'feature-coverage']);
+  assert.deepEqual(quality.report.qualityPolicy.requiredGates, ['smoke', 'feature-coverage', 'knowledge', 'growth']);
   assert.equal(quality.report.readiness.productionReady, true);
+  assert.equal(quality.knowledgeReview.skipped, false);
+  assert.equal(quality.growthCheckpoint.recorded || quality.growthCheckpoint.reason === 'duplicate-checkpoint', true);
+  assert.equal(quality.report.gates.some((gate) => gate.id === 'knowledge' && gate.status === 'pass'), true);
+  assert.equal(quality.report.gates.some((gate) => gate.id === 'growth' && gate.status === 'pass'), true);
+  assert.equal(Number(quality.report.growth.summary.completionCheckpoints ?? 0) >= 1, true);
   const html = await fs.readFile(quality.htmlPath, 'utf8');
   assert.ok(html.includes('回归结论概览'));
   assert.ok(html.includes('回归流程图'));
@@ -163,6 +173,9 @@ test('quality verify writes html eval report and learn creates experience skill'
   assert.ok(learned.files.skill.endsWith('SKILL.md'));
   const skill = await fs.readFile(learned.files.skill, 'utf8');
   assert.ok(skill.includes('## 触发条件'));
+  assert.ok(skill.includes('## 适用范围'));
+  assert.ok(skill.includes('## 典型输入'));
+  assert.ok(skill.includes('## 典型输出'));
   assert.ok(skill.includes('## 关联字段'));
   assert.ok(skill.includes('## 先看哪些证据'));
   const index = JSON.parse(await fs.readFile(path.join(project, '.openprd', 'knowledge', 'index.json'), 'utf8'));
@@ -567,7 +580,7 @@ test('quality requires reference-driven visual evidence for frontend changes', a
   const missing = await verifyQualityWorkspace(project);
   const missingGate = missing.report.gates.find((gate) => gate.id === 'visual-review');
   assert.equal(missing.ok, false);
-  assert.deepEqual(missing.report.qualityPolicy.requiredGates, ['smoke', 'feature-coverage', 'visual-review']);
+  assert.deepEqual(missing.report.qualityPolicy.requiredGates, ['smoke', 'feature-coverage', 'visual-review', 'knowledge', 'growth']);
   assert.equal(missing.report.visualReview.relevant, true);
   assert.equal(missing.report.visualReview.expectsReferenceCompare, true);
   assert.equal(missingGate.required, true);
@@ -679,7 +692,7 @@ test('high-risk hook blocks on workspace debt without reframing it as task failu
     env: {
       ...process.env,
       PATH: `${fakeCodexBin}${path.delimiter}${process.env.PATH}`,
-      OPENPRD_CLI: path.resolve('bin/openprd.js'),
+      OPENPRD_CLI: path.resolve('openprd/bin/openprd.js'),
     },
   });
   assert.equal(hookResult.status, 0);
@@ -720,7 +733,7 @@ test('quality does not treat OpenPRD freeze and handoff wording as a release gat
 
   const quality = await verifyQualityWorkspace(project);
   assert.equal(quality.report.qualityPolicy.scenarioTags.includes('release'), false);
-  assert.deepEqual(quality.report.qualityPolicy.requiredGates, ['smoke', 'feature-coverage']);
+  assert.deepEqual(quality.report.qualityPolicy.requiredGates, ['smoke', 'feature-coverage', 'knowledge', 'growth']);
   assert.equal(quality.report.readiness.productionReady, true);
 });
 
@@ -981,7 +994,7 @@ test('Stop hook injects dev-check wrap-up table for touched large files', async 
     encoding: 'utf8',
     env: {
       ...process.env,
-      OPENPRD_CLI: path.resolve('bin/openprd.js'),
+      OPENPRD_CLI: path.resolve('openprd/bin/openprd.js'),
     },
   });
   assert.equal(stop.status, 0);
@@ -1191,6 +1204,188 @@ test('visual-compare writes side-by-side review images', async () => {
   assert.equal((await sharp(beforeAfterCliOut).metadata()).format, 'jpeg');
 });
 
+test('visual-compare writes focus and parallel review boards and quality can detect them', async () => {
+  const project = await makeTempProject();
+  await initWorkspace(project, { templatePack: 'consumer' });
+  const reference = path.join(project, 'reference.png');
+  const actual = path.join(project, 'actual.png');
+  const experimentA = path.join(project, 'experiment-a.png');
+  const experimentB = path.join(project, 'experiment-b.png');
+
+  await sharp({
+    create: {
+      width: 320,
+      height: 200,
+      channels: 3,
+      background: '#f59e0b',
+    },
+  }).png().toFile(reference);
+  await sharp({
+    create: {
+      width: 320,
+      height: 200,
+      channels: 3,
+      background: '#2563eb',
+    },
+  }).png().toFile(actual);
+  await sharp({
+    create: {
+      width: 220,
+      height: 180,
+      channels: 3,
+      background: '#0f766e',
+    },
+  }).png().toFile(experimentA);
+  await sharp({
+    create: {
+      width: 220,
+      height: 180,
+      channels: 3,
+      background: '#7c3aed',
+    },
+  }).png().toFile(experimentB);
+
+  const focusBoardPath = path.join(project, 'focus-board.json');
+  await fs.writeFile(focusBoardPath, `${JSON.stringify({
+    mode: 'focus-board',
+    title: '登录卡片局部验收',
+    left: {
+      path: reference,
+      label: '效果图',
+    },
+    right: {
+      path: actual,
+      label: '实现截图',
+    },
+    focusRegions: [
+      {
+        label: '主按钮区',
+        reason: '检查文案长度和对齐',
+        leftBox: { unit: 'ratio', x: 0.18, y: 0.56, width: 0.28, height: 0.18 },
+        rightBox: { unit: 'ratio', x: 0.2, y: 0.58, width: 0.28, height: 0.18 },
+      },
+      {
+        label: '标题区',
+        reason: '检查字号和间距',
+        leftBox: { unit: 'ratio', x: 0.14, y: 0.12, width: 0.42, height: 0.2 },
+        rightBox: { unit: 'ratio', x: 0.14, y: 0.12, width: 0.42, height: 0.2 },
+      },
+    ],
+  }, null, 2)}\n`);
+
+  const focusResult = await visualCompareWorkspace(project, {
+    board: focusBoardPath,
+    maxPanelWidth: 180,
+  });
+  assert.equal(focusResult.mode, 'focus-board');
+  assert.equal(focusResult.focusRegions.length, 2);
+  assert.equal(focusResult.reviewArtifact.mode, 'focus-board');
+  assert.equal((await sharp(focusResult.outputPath).metadata()).format, 'jpeg');
+
+  const parallelBoardPath = path.join(project, 'parallel-board.json');
+  await fs.writeFile(parallelBoardPath, `${JSON.stringify({
+    mode: 'parallel-board',
+    title: '登录方案并行实验',
+    summary: '把方案截图和指标放到一个审查板里。',
+    columns: 2,
+    cardWidth: 240,
+    items: [
+      {
+        label: '方案 A',
+        subtitle: '更紧凑的按钮布局',
+        verdict: '继续观察',
+        media: [
+          { path: experimentA, label: '整体截图' },
+        ],
+        metrics: [
+          { label: '首屏耗时', value: '420ms' },
+          { label: '按钮高度', value: '44px' },
+        ],
+      },
+      {
+        label: '方案 B',
+        subtitle: '更宽的按钮和更大留白',
+        verdict: '优先评审',
+        media: [
+          { path: experimentB, label: '整体截图' },
+        ],
+        metrics: [
+          { label: '首屏耗时', value: '438ms' },
+          { label: '按钮高度', value: '48px' },
+        ],
+        notes: '继续看视觉一致性',
+      },
+    ],
+  }, null, 2)}\n`);
+
+  const parallelLogs = [];
+  const originalLog = console.log;
+  console.log = (...args) => parallelLogs.push(args.join(' '));
+  try {
+    assert.equal(await main([
+      'visual-compare',
+      project,
+      '--board',
+      parallelBoardPath,
+      '--json',
+    ]), 0);
+  } finally {
+    console.log = originalLog;
+  }
+  const parallelResult = JSON.parse(parallelLogs.join('\n'));
+  assert.equal(parallelResult.mode, 'parallel-board');
+  assert.equal(parallelResult.items.length, 2);
+  assert.equal((await sharp(parallelResult.outputPath).metadata()).format, 'jpeg');
+
+  const visualArtifacts = await listVisualReviewArtifacts(project);
+  assert.ok(visualArtifacts.some((artifact) => artifact.mode === 'focus-board'));
+  assert.ok(visualArtifacts.some((artifact) => artifact.mode === 'parallel-board'));
+
+  const includesAny = (text, patterns) => {
+    const haystack = String(text ?? '').toLowerCase();
+    return patterns.some((pattern) => {
+      if (pattern instanceof RegExp) {
+        return pattern.test(text);
+      }
+      return haystack.includes(String(pattern).toLowerCase());
+    });
+  };
+
+  const focusReview = detectVisualReview({
+    policy: {
+      requiredGates: ['visual-review'],
+    },
+    activeChangeContext: {
+      text: '这次主要做登录按钮局部对比，需要看局部细节和焦点区域。',
+    },
+    activeTasks: {
+      tasks: [],
+    },
+    visualArtifacts,
+    includesAny,
+  });
+  assert.equal(focusReview.status, 'pass');
+  assert.equal(focusReview.expectsFocusBoard, true);
+  assert.ok(focusReview.matchingArtifacts.some((artifact) => artifact.mode === 'focus-board'));
+
+  const parallelReview = detectVisualReview({
+    policy: {
+      requiredGates: ['visual-review'],
+    },
+    activeChangeContext: {
+      text: '这次在并行实验多个优化方向，需要一张并行实验方案证据板。',
+    },
+    activeTasks: {
+      tasks: [],
+    },
+    visualArtifacts,
+    includesAny,
+  });
+  assert.equal(parallelReview.status, 'pass');
+  assert.equal(parallelReview.expectsParallelBoard, true);
+  assert.ok(parallelReview.matchingArtifacts.some((artifact) => artifact.mode === 'parallel-board'));
+});
+
 test('dev-check auto-applies detected unknown code extensions', async () => {
   const project = await makeTempProject();
   await initWorkspace(project, { templatePack: 'consumer' });
@@ -1221,6 +1416,8 @@ test('dev-check auto-applies detected unknown code extensions', async () => {
   assert.equal(review.summary.applied, 1);
   assert.equal(review.applied[0].id, 'code-extension-astro');
   assert.equal(review.applied[0].applyMode, 'auto');
+  assert.equal(review.ledger.summary.autoApplied, 1);
+  assert.equal(review.ledger.summary.current.applied, 1);
 
   const reviewLogs = [];
   const originalLog = console.log;
@@ -1233,6 +1430,7 @@ test('dev-check auto-applies detected unknown code extensions', async () => {
   const reviewText = reviewLogs.join('\n');
   assert.doesNotMatch(reviewText, /状态: 待确认/);
   assert.match(reviewText, /候选: 0 待确认，1 已应用，0 已拒绝。/);
+  assert.match(reviewText, /账本: events 1，observe 1，pending 0，auto 1，manual 0，reconcile 0，checkpoint 0，reject 0，skip 0/);
   assert.match(reviewText, /下一步: 当前没有待确认增长候选。/);
 
   const standardsConfig = JSON.parse(await fs.readFile(path.join(project, '.openprd', 'standards', 'config.json'), 'utf8'));
@@ -1278,6 +1476,7 @@ test('dev-check also auto-applies low-confidence unknown code extensions', async
   assert.equal(review.summary.pending, 0);
   assert.equal(review.summary.applied, 1);
   assert.equal(review.applied[0].id, 'code-extension-tpl');
+  assert.equal(review.ledger.summary.autoApplied, 1);
 
   const reviewLogs = [];
   const originalLog = console.log;
@@ -1290,6 +1489,7 @@ test('dev-check also auto-applies low-confidence unknown code extensions', async
   const reviewText = reviewLogs.join('\n');
   assert.doesNotMatch(reviewText, /状态: 待确认/);
   assert.match(reviewText, /候选: 0 待确认，1 已应用，0 已拒绝。/);
+  assert.match(reviewText, /账本: events 1，observe 1，pending 0，auto 1，manual 0，reconcile 0，checkpoint 0，reject 0，skip 0/);
 
   const standardsConfig = JSON.parse(await fs.readFile(path.join(project, '.openprd', 'standards', 'config.json'), 'utf8'));
   assert.deepEqual(standardsConfig.developmentStandards.codeFileLines.codeFileExtensions, ['.json', '.md', '.tpl']);
@@ -1333,11 +1533,14 @@ test('growth init reconciles older pending code-extension candidates into auto-a
   const growth = await initGrowthWorkspace(project);
   assert.equal(growth.reconciledAutoApplied.length, 1);
   assert.equal(growth.reconciledAutoApplied[0].id, 'code-extension-md');
+  assert.equal(growth.ledger.summary.reconciledAutoApplied, 1);
+  assert.equal(growth.ledger.summary.autoApplied, 1);
 
   const after = await reviewGrowthWorkspace(project);
   assert.equal(after.summary.pending, 0);
   assert.equal(after.summary.applied, 1);
   assert.equal(after.applied[0].applyMode, 'auto');
+  assert.equal(after.ledger.summary.reconciledAutoApplied, 1);
 
   const standardsConfig = JSON.parse(await fs.readFile(path.join(project, '.openprd', 'standards', 'config.json'), 'utf8'));
   assert.deepEqual(standardsConfig.developmentStandards.codeFileLines.codeFileExtensions, ['.json', '.md']);

@@ -209,6 +209,7 @@ test('init creates a workspace and validate passes', async () => {
   assert.ok(requirementIntakeSkill.includes('不要按关键词判断'));
   assert.ok(requirementIntakeSkill.includes('base'));
   assert.ok(requirementIntakeSkill.includes('consumer'));
+  assert.ok(requirementIntakeSkill.includes('面向个人消费者场景'));
   assert.ok(requirementIntakeSkill.includes('b2b'));
   assert.ok(requirementIntakeSkill.includes('agent'));
   assert.ok(await fs.stat(path.join(project, '.codex', 'skills', 'openprd-requirement-intake', 'references', 'routing-rubric.md')).then(() => true));
@@ -260,8 +261,13 @@ test('clarify stays inline and synthesize writes a review artifact', async () =>
   assert.ok(clarify.intakeReflection);
   assert.ok(clarify.intakeReflectionPath);
   assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('我先用产品和业务语言复述一下')));
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('需求判断：')));
   assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('主要服务对象')));
   assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('第一版先让用户做到')));
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('| 功能模块 |')));
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('| 技术部分 |')));
+  assert.ok(clarify.inlineClarification.lines.some((line) => line.includes('先整理需求摘要给你确认')));
+  assert.equal(clarify.inlineClarification.lines.some((line) => line.includes('确认执行')), false);
   assert.ok((await fs.readFile(path.join(project, '.openprd', 'engagements', 'active', 'intake-reflection.md'), 'utf8')).includes('首轮项目画像'));
 
   await classifyWorkspace(project, 'agent');
@@ -373,7 +379,7 @@ test('clarify stays inline and synthesize writes a review artifact', async () =>
   assert.ok(reviewHtml.includes('review-detail-summary'));
   assert.ok(reviewHtml.includes('review-detail-body'));
   assert.ok(reviewHtml.includes('OpenPrD Review: 认可并继续下一步'));
-  assert.ok(reviewHtml.includes('请先记录这版稳定评审稿，并继续当前 OpenPrd 下一步。'));
+  assert.ok(reviewHtml.includes('请先记录这次确认结果，并继续推进后续落地内容。'));
   assert.ok(reviewHtml.includes('openprd review . --mark confirmed'));
   assert.ok(reviewHtml.includes(`--version &#39;${synthesized.snapshot.versionId}&#39;`));
   assert.ok(reviewHtml.includes(`--digest &#39;${synthesized.snapshot.digest}&#39;`));
@@ -439,7 +445,7 @@ test('clarify stays inline and synthesize writes a review artifact', async () =>
     workUnit: synthesized.workUnitId,
   });
   assert.equal(wrongDigestReview.ok, false);
-  assert.match(wrongDigestReview.errors[0], /Digest mismatch/);
+  assert.match(wrongDigestReview.errors[0], /确认指纹不匹配/);
 
   const wrongWorkUnitReview = await reviewWorkspace(project, {
     mark: 'confirmed',
@@ -448,7 +454,7 @@ test('clarify stays inline and synthesize writes a review artifact', async () =>
     workUnit: 'other-work-unit',
   });
   assert.equal(wrongWorkUnitReview.ok, false);
-  assert.match(wrongWorkUnitReview.errors[0], /Work unit mismatch/);
+  assert.match(wrongWorkUnitReview.errors[0], /稿件不一致/);
 
   const confirmedReview = await reviewWorkspace(project, {
     mark: 'confirmed',

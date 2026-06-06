@@ -1,4 +1,4 @@
-# PRD Template Lenses
+# PRD 场景视角参考
 
 ## 共同骨架
 
@@ -13,9 +13,9 @@
 7. 有什么风险：依赖、约束、成本、滥用、开放问题
 8. 如何交接：review、change、tasks、负责人、下一步
 
-`base/prd.md` 提供这个骨架。其他模板不是附录，而是 lens：它们改变正文组织、需求矩阵和验收重点。
+`base/prd.md` 提供这个骨架。其他模板不是附录，而是场景视角：它们会改变正文组织、需求矩阵和验收重点。
 
-## Base
+## 通用产品或工程场景（Base）
 
 用于无法明确归类、或通用工程/产品需求。
 
@@ -32,7 +32,7 @@
 - 约束、依赖、风险、开放问题
 - 交接与下一步
 
-## Consumer
+## 面向个人消费者场景（Consumer）
 
 用于个人用户、C 端体验、内容、增长、留存或情绪价值明显的需求。
 
@@ -53,7 +53,7 @@
 - Activation / Retention Signal
 - UX Risk
 
-## B2B
+## 面向企业服务场景（B2B）
 
 用于企业、团队、后台、SaaS、组织流程、管理/审批/权限相关需求。
 
@@ -74,7 +74,7 @@
 - Admin / Operator Impact
 - Integration Dependency
 
-## Agent
+## 以 Agent 为主要使用场景（Agent）
 
 用于 AI Agent、harness、skill、自动化、代码代理、人机协作或评估体系。
 

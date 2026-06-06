@@ -22,7 +22,7 @@ description: OpenPrd 入口路由 skill。先判断当前任务该读哪个 repo
 
 ## 路由表
 
-- 需求入口分流、用户可见需求类型与内部 L0/L1/L2 路由码对照、PRD lens 选择：`skills/openprd-requirement-intake/SKILL.md`
+- 需求入口分流、用户可见需求类型与内部 L0/L1/L2 路由码对照、PRD 场景视角选择：`skills/openprd-requirement-intake/SKILL.md`
 - 主工作流、review/change/tasks、`run/loop`：`skills/openprd-harness/SKILL.md`
 - 最佳实践、benchmark、公开 GitHub 仓库、第三方技术事实、prompt/context engineering：`skills/openprd-benchmark-router/SKILL.md`
 - `docs/basic/`、文件说明书、文件夹 README、文档标准：`skills/openprd-standards/SKILL.md`

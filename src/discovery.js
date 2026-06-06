@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { analyzePrdSnapshot, buildPrdSnapshot, formatVersionId } from './prd-core.js';
+import { formatProductTypeDisplay } from './product-type-copy.js';
 import { analyzeOpenSpecTaskVolumes } from './openspec/tasks.js';
 import { legacyOpenSpecDiscoveryDir, openPrdDiscoveryDir, readDiscoveryConfig } from './openspec/paths.js';
 import { appendJsonl, cjoin, exists, readJson, readJsonl, writeJson, writeText } from './fs-utils.js';
@@ -194,7 +195,7 @@ function renderDiscoveryContext({ mode, projectRoot, sourceRoot, snapshot, analy
     `- 项目根目录: ${projectRoot}`,
     `- 来源根目录: ${sourceRoot}`,
     `- PRD 版本: ${snapshot.versionId}`,
-    `- 产品类型: ${snapshot.productType ?? '未分类'}`,
+    `- 产品场景: ${formatProductTypeDisplay(snapshot.productType, { fallback: '待确认' })}`,
     `- 必填字段完成度: ${analysis.completedRequiredFields}/${analysis.totalRequiredFields}`,
     `- 覆盖项: ${coverageMatrix.summary.pending}/${coverageMatrix.summary.total} 待处理`,
     next ? `- 下一项: ${next.title}` : '- 下一项: 无',

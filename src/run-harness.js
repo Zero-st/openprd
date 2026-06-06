@@ -2,7 +2,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { labelExecutionMode, taskExecutionStrategy, describeExecutionStrategy } from './execution-strategy.js';
 import { appendJsonl, appendText, cjoin, exists, readJson, readJsonl, writeJson, writeText } from './fs-utils.js';
-import { OPENPRD_HARNESS_TURN_STATE, recordKnowledgeReviewSignal, reviewKnowledgeWorkspace } from './knowledge.js';
+import {
+  OPENPRD_HARNESS_TURN_STATE,
+  recordKnowledgeReviewSignal,
+  recordKnowledgeSkillAdoption,
+  resolveKnowledgeSkillMatches,
+  reviewKnowledgeWorkspace,
+} from './knowledge.js';
 import { readSessionBinding } from './session-binding.js';
 import { readSessionRegistryEntry } from './session-registry.js';
 import { timestamp } from './time.js';
@@ -23,8 +29,9 @@ const OPENPRD_LOOP_REQUIRED_IMPLEMENTATION_TASK_THRESHOLD = 10;
 const CONTINUATION_SESSION_PATTERN = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
 const CONTINUATION_TASK_HANDLE_PATTERN = /\b[a-z0-9._-]+:T\d{3}\.\d{2}:[a-z0-9._-]+\b/i;
 const CONTINUATION_WORK_UNIT_PATTERN = /\bwu-[a-z0-9._-]+\b/i;
-const CONTINUATION_EXPLICIT_PATTERN = /(继续(这个|这条|当前)?(对话|任务|会话|记录|历史)?|续做|接着做|继续执行|继续推进)/i;
+const CONTINUATION_EXPLICIT_PATTERN = /(?:(?:继续|续做|接着做|继续执行|继续推进)(?:这个|这条|当前)?\s*(?:对话|任务|会话|记录|历史|Codex\s*任务)|(?:对话|任务|会话|记录|历史|Codex\s*任务).{0,6}(?:继续|续做|接着做|继续执行|继续推进)|^(?:继续|续做|接着做|继续执行|继续推进)\s*(?::|：))/i;
 const CONTINUATION_CURRENT_PATTERN = /(继续当前|当前(这个|这条)?(任务|会话|记录|需求|变更)|current\s+(task|change|session)|resume current)/i;
+const SHORT_AFFIRMATIVE_PATTERN = /^(可以|好|行|确认|没问题|OK|ok|yes|Yes|yep|Yep)[。！!,.，\s]*$/;
 function harnessFile(projectRoot, relativePath) {
   return cjoin(projectRoot, relativePath);
 }
@@ -203,7 +210,7 @@ function executionGate() {
     confirmationChecklistRequired: true,
     allowedIntents: ['开发', '实现', '修复', '继续任务', '落地执行', '深度调研', '深度对标', '复刻落地', '提交'],
     readOnlyIntents: ['看看', '规划', '梳理', '分析', '评估', '预计动哪些文件', '怎么改', '代码审查'],
-    rule: '只有当用户当前明确要求实现、继续、深度调研、对标或提交时，才运行 executionCommand。若还需要向用户索取执行授权，先展示 executionConfirmationChecklist，再请求明确确认；规划、分析、文件影响范围和审查类请求保持只读，并基于证据回答。',
+    rule: '只有当用户当前明确要求实现、继续、深度调研、对标或提交时，才运行 executionCommand。单纯的“请帮我实现/继续实现”只表示有执行意图，不表示可以跳过 requirement 摘要确认、`capture/classify/synthesize` 写入路径或 review；只有用户明确表示“不需要进行任何确认”时，才允许静默走完整 requirement write path，并对当前精确匹配的稳定 review artifact 记录确认。若还需要向用户索取执行授权，先展示 executionConfirmationChecklist，再请求明确确认；规划、分析、文件影响范围和审查类请求保持只读，并基于证据回答。',
   };
 }
 
@@ -213,48 +220,63 @@ function buildExecutionConfirmationChecklist(recommendation) {
   }
   const parallelPlan = recommendation.parallelPlan ?? null;
   const scope = [
-    recommendation.executionMode ? `执行模式: ${labelExecutionMode(recommendation.executionMode)}` : null,
-    recommendation.changeId ? `变更: ${recommendation.changeId}` : null,
-    recommendation.task ? `任务: ${recommendation.task.id} ${recommendation.task.title}` : null,
-    recommendation.coverageItem ? `覆盖项: ${recommendation.coverageItem.id} ${recommendation.coverageItem.title}` : null,
-    recommendation.prd?.versionId ? `PRD: ${recommendation.prd.versionId}` : null,
+    '只在这次已经确认的范围内继续推进',
+    parallelPlan?.eligible ? '如果需要分头推进，会先划清各自负责的部分，再统一收口' : null,
   ].filter(Boolean);
   return {
     required: true,
-    title: '执行确认清单',
-    objective: recommendation.title ?? '推进当前 OpenPrd 推荐动作',
+    title: '开始动手前先确认这些',
+    objective: recommendation.title ?? '继续推进本次调整',
     scope,
     implementationItems: [
-      recommendation.command ? `先用只读命令复核上下文: ${recommendation.command}` : null,
-      recommendation.preparationCommand ? `准备执行环境或任务计划: ${recommendation.preparationCommand}` : null,
-      `运行执行命令: ${recommendation.executionCommand}`,
-      parallelPlan?.eligible ? `并行策略: ${parallelPlan.summary}` : null,
-      parallelPlan?.focusTask ? `当前 worker shard: ${parallelPlan.focusTask.id} ${parallelPlan.focusTask.title} -> ${parallelPlan.focusTask.writeScope.join(', ')}` : null,
-      parallelPlan?.worktreeRecommended ? '建议每个 worker 使用独立 worktree 或等价隔离环境，避免写入范围互相踩踏。' : null,
-      '把改动限制在当前已确认的 PRD、change、task 或 discovery 覆盖项内',
+      '我会先核对当前情况，再继续整理后续落地内容。',
+      '我只会在这次已经确认的范围内继续，不会顺手扩到别的事项。',
+      parallelPlan?.eligible ? '如果需要多人配合，我会先划清边界，再统一收口检查。' : null,
     ].filter(Boolean),
     outOfScope: [
-      '不默认处理清单外的历史需求或相似 active change',
-      '不默认执行 commit、push、release 或 publish',
-      '不做清单外的全局环境变更；确需全局修复时必须在清单里单列',
-      parallelPlan?.eligible ? '不默认自动 spawn worker；主 Agent 需要先确认 shard 边界和窗口归属。' : null,
+      '不会默认处理这次范围以外的历史问题。',
+      '不会默认顺带做提交、发布或额外的全局调整。',
+      '如果真的需要扩大范围，我会先单独说明。',
     ].filter(Boolean),
     verification: [
-      recommendation.verifyCommand ? `执行后验证: ${recommendation.verifyCommand}` : null,
-      parallelPlan?.eligible ? '每个 worker 先完成 local-verify，主 Agent 再统一执行总验证。' : null,
-      '代码修改完成后，对本轮 touched code files 运行 openprd dev-check . <file...>',
-      '声明就绪前运行 openprd standards . --verify、openprd quality . --verify 和 openprd run . --verify',
+      '完成后我会补做这次调整需要的检查。',
+      parallelPlan?.eligible ? '如果是分头推进，会先各自自检，再统一做总检查。' : null,
+      '在宣布完成前，我会再做一次整体核对。',
     ].filter(Boolean),
     risks: [
-      '执行命令会写入工作区，用户确认前不得运行',
-      '工作区历史 standards/quality debt 可能导致最终 verify 出现非本任务阻断项，需要单列说明',
-      parallelPlan?.eligible ? '并行 worker 之间不能改动重叠 write-scope；发生冲突时由主 Agent 收口。' : null,
+      '这一步会正式写入当前工作区。',
+      '如果牵出和本次无关的历史遗留问题，我会单列说明，不把它混成本次失败。',
+      parallelPlan?.eligible ? '如果多人同时推进，我会避免范围互相踩踏。' : null,
     ],
-    confirmationPrompt: '请先把这份清单给用户确认；用户明确同意后再运行 executionCommand。',
+    confirmationPrompt: '如果你希望我现在就按这次范围继续，我就直接往下做。',
   };
 }
 
-function withExecutionConfirmationChecklist(recommendation) {
+function recommendationNeedsExtraExecutionConfirmation(recommendation, requirementGate) {
+  if (!recommendation?.executionCommand) {
+    return false;
+  }
+  const reviewContinuationAuthorized = Boolean(requirementGate?.reviewActionAuthorization?.continueAfterReview);
+  const silentReviewRecordingAuthorized = requirementGate?.status === 'review-recording-authorized';
+  const implementationAlreadyAuthorized = requirementGate?.status === 'execution-authorized';
+  const explicitExecution = Boolean(requirementGate?.intent?.explicitExecution);
+
+  if (recommendation.type === 'prd-change') {
+    return !(reviewContinuationAuthorized || silentReviewRecordingAuthorized);
+  }
+  if (recommendation.type === 'task' || recommendation.type === 'loop-task') {
+    return !(implementationAlreadyAuthorized || (explicitExecution && (reviewContinuationAuthorized || silentReviewRecordingAuthorized)));
+  }
+  return true;
+}
+
+function withExecutionConfirmationChecklist(recommendation, options = {}) {
+  if (!recommendationNeedsExtraExecutionConfirmation(recommendation, options.requirementGate)) {
+    return {
+      ...recommendation,
+      executionConfirmationChecklist: null,
+    };
+  }
   const checklist = buildExecutionConfirmationChecklist(recommendation);
   if (!checklist) {
     return recommendation;
@@ -287,7 +309,7 @@ function analyzeRunMessage(message = null) {
   const workUnitId = text.match(CONTINUATION_WORK_UNIT_PATTERN)?.[0] ?? null;
   const explicit = CONTINUATION_EXPLICIT_PATTERN.test(text);
   const explicitCurrent = CONTINUATION_CURRENT_PATTERN.test(text);
-  const requested = explicit || Boolean(sessionId || taskHandle || workUnitId);
+  const requested = explicit || Boolean(taskHandle || workUnitId);
   if (!requested) {
     return {
       kind: 'default',
@@ -323,6 +345,14 @@ function normalizeSearchText(value) {
     .toLowerCase()
     .replace(/[_:/.-]+/g, ' ')
     .replace(/[^\p{Letter}\p{Number}\u4e00-\u9fff]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function stripMarkdownText(value) {
+  return String(value ?? '')
+    .replace(/\[[^\]]*]\([^)]+\)/g, ' ')
+    .replace(/[`*_>#~-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -388,6 +418,77 @@ function scoreSearchCandidate(query, fields = []) {
     bestScore = Math.max(bestScore, score);
   }
   return bestScore;
+}
+
+function isShortAffirmativeMessage(message) {
+  return SHORT_AFFIRMATIVE_PATTERN.test(stripMarkdownText(message));
+}
+
+function requirementGateMatchesMessage(message, gate) {
+  if (!gate?.active) {
+    return false;
+  }
+  const text = String(message ?? '').trim();
+  if (!text || isShortAffirmativeMessage(text)) {
+    return true;
+  }
+  const gateFields = [
+    gate.promptPreview,
+    gate.reviewActionAuthorization?.promptPreview,
+  ].filter(Boolean);
+  if (gateFields.length === 0) {
+    return true;
+  }
+  const queryTokens = searchTokens(text);
+  const gateTokens = uniqueItems(gateFields.flatMap((field) => searchTokens(field)));
+  const sharedTokens = queryTokens.filter((token) => gateTokens.includes(token));
+  if (sharedTokens.some((token) => token.length >= 6)) {
+    return true;
+  }
+  const overlapBase = Math.min(queryTokens.length, gateTokens.length);
+  if (sharedTokens.length >= 2 && overlapBase > 0 && (sharedTokens.length / overlapBase) >= 0.5) {
+    return true;
+  }
+  return scoreSearchCandidate(text, gateFields) >= 80;
+}
+
+function assessRequirementGateRelevance({ message, gate, laneRequest, resolvedTarget }) {
+  if (!gate?.active) {
+    return {
+      active: false,
+      matchedCurrentMessage: false,
+      relevance: 'inactive',
+      reason: null,
+    };
+  }
+  if (laneRequest?.requested || resolvedTarget?.matched) {
+    return {
+      active: true,
+      matchedCurrentMessage: false,
+      relevance: 'background',
+      reason: '当前请求正在显式继续历史会话/任务，或已定位到更具体目标；active requirement intake 仅作为背景提醒。',
+    };
+  }
+  const matchedCurrentMessage = requirementGateMatchesMessage(message, gate);
+  return {
+    active: true,
+    matchedCurrentMessage,
+    relevance: matchedCurrentMessage ? 'primary' : 'background',
+    reason: matchedCurrentMessage
+      ? '当前请求与 active requirement intake 匹配，优先继续这条需求入口。'
+      : '当前请求与 active requirement intake 的摘要不匹配；旧 gate 仅作为背景提醒，不抢本轮默认路线。',
+  };
+}
+
+function appendRequirementGateReminder(reason, requirementGateAssessment, requirementGate) {
+  if (requirementGateAssessment?.relevance !== 'background' || !requirementGate?.active) {
+    return reason;
+  }
+  const reminder = [
+    requirementGateAssessment.reason,
+    requirementGate?.promptPreview ? `历史需求摘要: ${requirementGate.promptPreview}` : null,
+  ].filter(Boolean).join(' ');
+  return [reason, reminder].filter(Boolean).join(' ');
 }
 
 async function readFirstHeading(filePath, fallback = null) {
@@ -1233,11 +1334,11 @@ function buildPrdPromotionRecommendation({ changes, next }) {
 
   return {
     type: 'prd-change',
-    title: `生成 ${suggestedChangeId} 的 change 和任务拆解`,
+    title: '整理本次调整，并拆出后续任务',
     command: 'openprd review . --open',
     executionCommand: `openprd change . --generate --change ${shellQuote(suggestedChangeId)}`,
     verifyCommand: `openprd change . --validate --change ${shellQuote(suggestedChangeId)}`,
-    reason: '最新 PRD review.html 已确认，但还没有 active change；进入实现前需要先生成 change、spec 和结构化任务。',
+    reason: '这版需求已经确认，下一步先整理本次调整范围，再拆出可直接执行的后续任务。',
     changeId: suggestedChangeId,
     task: null,
     coverageItem: null,
@@ -1258,9 +1359,9 @@ function buildRequirementIntakeRecommendation({ gate, next, activeChange }) {
     'clarify-user': '继续本轮需求入口澄清',
     classify: '补齐本轮需求的产品类型',
     interview: '补齐本轮需求的关键事实',
-    synthesize: '生成本轮需求的 PRD 评审稿',
+    synthesize: '生成本轮需求的确认稿',
     diagram: '生成本轮需求的可视化评审',
-    review: '确认本轮需求的 review.html',
+    review: '查看并确认本轮需求稿',
     freeze: '进入本轮需求定稿前检查',
     handoff: '导出本轮需求交接包',
   };
@@ -1270,8 +1371,8 @@ function buildRequirementIntakeRecommendation({ gate, next, activeChange }) {
     command: next?.recommendation?.suggestedCommand ?? 'openprd clarify .',
     verifyCommand: 'openprd run . --verify',
     reason: [
-      '当前有 active requirement intake；先围绕本轮需求完成澄清、评审、change 和任务拆解。',
-      activeChange ? `历史 active change ${activeChange} 仅作为提醒，不抢本轮默认执行路线。` : null,
+      '当前有一条还在推进中的新需求；先把需求澄清、确认，再整理本次调整和后续任务。',
+      activeChange ? `之前还有一项历史事项 ${activeChange}，这里只把它当背景提醒，不抢这次主线。` : null,
       next?.recommendation?.reason ?? null,
     ].filter(Boolean).join(' '),
     changeId: null,
@@ -1282,6 +1383,84 @@ function buildRequirementIntakeRecommendation({ gate, next, activeChange }) {
       promptPreview: gate?.promptPreview ?? null,
       intakeMode: gate?.intakeMode ?? null,
       sessionId: gate?.sessionId ?? null,
+    },
+  };
+}
+
+function buildStoredVerificationRecommendation(runState, options = {}) {
+  const lastVerification = runState?.lastVerification;
+  if (!lastVerification || lastVerification.taskReady !== true) {
+    return null;
+  }
+  const workspaceReady = lastVerification.workspaceReady === true;
+  const workspaceAttention = lastVerification.workspaceAttention ?? null;
+  const changeId = lastVerification.changeId ?? options.focusedChangeId ?? options.activeChange ?? null;
+  return {
+    type: workspaceReady ? 'verification-ready' : 'verification-workspace-attention',
+    title: workspaceReady ? '当前项目已完成并通过验证' : '当前任务已完成，工作区还有待处理项',
+    command: 'openprd run . --verify',
+    verifyCommand: 'openprd run . --verify',
+    reason: workspaceReady
+      ? '最近一次 run verify 已经闭环，当前没有待执行任务或待澄清入口；除非有新需求进入，否则优先复用已沉淀结果。'
+      : (workspaceAttention?.detail ?? '最近一次 run verify 显示任务级验证已通过，但工作区级别还有待补证据或待收口项。'),
+    changeId,
+    task: null,
+    coverageItem: null,
+    verification: lastVerification,
+  };
+}
+
+function buildVerificationRecommendation({ changeId, readiness, workspaceAttention, knowledgeReview, qualityCheck }) {
+  if (readiness.taskReady !== true) {
+    return {
+      type: 'verification-fix',
+      title: '先修复当前验证失败项',
+      command: 'openprd run . --verify',
+      verifyCommand: 'openprd run . --verify',
+      reason: '最近一次 run verify 没有通过当前任务级验证，需要先修复标准、变更或任务级检查失败项。',
+      changeId,
+      task: null,
+      coverageItem: null,
+      verification: {
+        ...readiness,
+        workspaceAttention,
+        knowledgeCandidateId: knowledgeReview?.candidateId ?? null,
+        qualityReportPath: qualityCheck?.reportPath ?? null,
+      },
+    };
+  }
+  if (readiness.workspaceReady === true) {
+    return {
+      type: 'verification-ready',
+      title: '当前项目已完成并通过验证',
+      command: 'openprd run . --verify',
+      verifyCommand: 'openprd run . --verify',
+      reason: '最近一次 run verify、quality、standards 和变更验证都已闭环；当前没有新的待执行动作时，不应该再回到 clarify-user。',
+      changeId,
+      task: null,
+      coverageItem: null,
+      verification: {
+        ...readiness,
+        workspaceAttention,
+        knowledgeCandidateId: knowledgeReview?.candidateId ?? null,
+        qualityReportPath: qualityCheck?.reportPath ?? null,
+      },
+    };
+  }
+  return {
+    type: 'verification-workspace-attention',
+    title: '当前任务已完成，工作区还有待处理项',
+    command: 'openprd run . --verify',
+    verifyCommand: 'openprd run . --verify',
+    reason: workspaceAttention?.detail ?? '最近一次 run verify 显示当前任务已通过，但工作区级别还有待补证据或待收口项。',
+    changeId,
+    task: null,
+    coverageItem: null,
+    verification: {
+      ...readiness,
+      workspaceAttention,
+      knowledgeCandidateId: knowledgeReview?.candidateId ?? null,
+      qualityReportPath: qualityCheck?.reportPath ?? null,
     },
   };
 }
@@ -1297,8 +1476,10 @@ function buildRunRecommendation({
   next,
   loopFeatureList,
   requirementGate,
+  requirementGateAssessment,
   laneRequest,
   resolvedTarget,
+  runState,
 }) {
   if (
     ['task-handle', 'work-unit'].includes(laneRequest?.selectorType)
@@ -1311,7 +1492,7 @@ function buildRunRecommendation({
       activeChange,
     });
   }
-  if (requirementGate?.active && !laneRequest?.requested && !resolvedTarget?.matched) {
+  if (requirementGateAssessment?.relevance === 'primary') {
     return buildRequirementIntakeRecommendation({ gate: requirementGate, next, activeChange });
   }
   if (taskState?.nextTask) {
@@ -1350,7 +1531,7 @@ function buildRunRecommendation({
       const loopReady = loopFeatureList?.changeId === taskState.changeId && Array.isArray(loopFeatureList.tasks);
       return {
         type: 'loop-task',
-        title: `用 Loop 执行 ${task.id}: ${task.title}`,
+        title: `继续推进：${task.title}`,
         command: `openprd tasks . --change ${shellQuote(taskState.changeId)}`,
         preparationCommand: loopReady
           ? `openprd loop . --next --item ${shellQuote(task.id)}`
@@ -1361,8 +1542,8 @@ function buildRunRecommendation({
         commitCommand: `openprd loop . --finish --item ${shellQuote(task.id)} --commit`,
         verifyCommand: `openprd loop . --verify --item ${shellQuote(task.id)}`,
         reason: laneRequiresIsolation
-          ? '当前执行焦点来自显式恢复或跨线定位；默认建议使用独立 worktree 和 OpenPrd Loop 单任务会话，避免与其他需求线共享执行状态。'
-          : `当前变更包含 ${implementationTasks} 个实质实现任务，达到 ${OPENPRD_LOOP_REQUIRED_IMPLEMENTATION_TASK_THRESHOLD} 个实现任务的拆分阈值；建议使用独立 worktree 和 OpenPrd Loop 单任务会话，且只有用户明确要求开发、继续任务或深度对标落地时才执行。`,
+          ? '这件事来自指定历史记录，最好放到单独环境里接着做，避免和别的事项串线。'
+          : '待落地内容比较多，适合拆成一个个独立小任务推进，再统一收口检查。',
         changeId: taskState.changeId,
         task,
         coverageItem: null,
@@ -1382,13 +1563,13 @@ function buildRunRecommendation({
       };
     }
     const lightweightReason = laneRequiresIsolation
-      ? '当前任务来自显式恢复或跨线定位，默认建议使用隔离 session / cwd 或独立 worktree，避免共享 active 执行线。'
+      ? '这件事来自指定历史记录，最好放到单独环境里继续，避免和别的事项串线。'
       : executionMode === 'parallel-workers'
-        ? `当前变更还有 ${pendingImplementationTasks} 个待处理的实质实现任务，已达到 ${OPENPRD_PARALLEL_WORKER_IMPLEMENTATION_TASK_THRESHOLD} 个并行候选阈值，但尚未达到独立隔离阈值 ${OPENPRD_LOOP_REQUIRED_IMPLEMENTATION_TASK_THRESHOLD}；建议由主 Agent 分派边界清晰的 worker shard，并在主线程统一 review、integrate 和总验证。`
-        : '存在一个依赖已就绪的 OpenPrd 任务；只有用户明确要求开发、实现或继续任务时才推进。';
+        ? '待处理的落地内容比较多，适合先分头推进，再统一收口检查。'
+        : '已经有一项可以继续推进的后续任务；只要用户明确要继续，就可以往下做。';
     return {
       type: 'task',
-      title: `推进 ${task.id}: ${task.title}`,
+      title: `继续推进：${task.title}`,
       command: `openprd tasks . --change ${shellQuote(taskState.changeId)}`,
       preparationCommand: executionMode === 'parallel-workers'
         ? `openprd loop . --plan --change ${shellQuote(taskState.changeId)}`
@@ -1416,10 +1597,10 @@ function buildRunRecommendation({
   if (taskState && taskState.summary?.pending === 0 && focusedChangeId) {
     return {
       type: 'change-review',
-      title: `校验已完成的变更 ${focusedChangeId}`,
+      title: '检查本次调整是否都已补齐',
       command: `openprd change . --validate --change ${shellQuote(focusedChangeId)}`,
       verifyCommand: `openprd change . --validate --change ${shellQuote(focusedChangeId)}`,
-      reason: '当前激活变更没有待处理的结构化任务。',
+      reason: '当前这次调整里的后续任务已经处理完了。',
       changeId: focusedChangeId,
       task: null,
       coverageItem: null,
@@ -1434,11 +1615,11 @@ function buildRunRecommendation({
     const item = compactCoverageItem(nextCoverage);
     return {
       type: 'discovery',
-      title: `调研 ${item.title}`,
+      title: `继续补充调研：${item.title}`,
       command: 'openprd discovery . --verify',
       executionCommand: `openprd discovery . --advance --item ${shellQuote(item.id)} --claim <evidence-backed-claim> --evidence <path>`,
       verifyCommand: 'openprd discovery . --verify',
-      reason: '存在一个待处理的 OpenPrd discovery 覆盖项；只有用户明确要求深度调研、对标、复刻或持续补全时才推进覆盖项。',
+      reason: '还有一个待补的调研点；只有用户明确要求继续深挖、对标或复刻时再推进。',
       changeId: focusedChangeId ?? activeChange,
       task: null,
       coverageItem: item,
@@ -1448,21 +1629,35 @@ function buildRunRecommendation({
   if (discovery?.coverageMatrix?.summary?.pending === 0 && discovery?.runId) {
     return {
       type: 'discovery-review',
-      title: `校验 discovery run ${discovery.runId}`,
+      title: '检查这轮调研是否已经收口',
       command: 'openprd discovery . --verify',
       verifyCommand: 'openprd discovery . --verify',
-      reason: '当前 discovery run 没有待处理覆盖项。',
+      reason: '当前这轮调研已经没有待补项了。',
       changeId: focusedChangeId ?? activeChange,
       task: null,
       coverageItem: null,
     };
   }
+  const storedVerificationRecommendation = (
+    requirementGateAssessment?.relevance !== 'primary'
+    && !laneRequest?.requested
+    && !resolvedTarget?.matched
+    && (next?.recommendation?.nextAction ?? 'clarify-user') === 'clarify-user'
+  )
+    ? buildStoredVerificationRecommendation(runState, {
+      activeChange,
+      focusedChangeId,
+    })
+    : null;
+  if (storedVerificationRecommendation) {
+    return storedVerificationRecommendation;
+  }
   return {
     type: 'workflow',
-    title: next?.recommendation?.nextAction ?? 'Inspect OpenPrd next action',
+    title: next?.recommendation?.nextAction ?? '查看当前建议下一步',
     command: next?.recommendation?.suggestedCommand ?? 'openprd next .',
     verifyCommand: 'openprd validate .',
-    reason: next?.recommendation?.reason ?? 'No active task or discovery item was found.',
+    reason: next?.recommendation?.reason ?? '当前没有找到可以直接继续推进的任务或调研项。',
     changeId: focusedChangeId ?? activeChange,
     task: null,
     coverageItem: null,
@@ -1530,6 +1725,12 @@ async function buildRunContext(projectRoot, dependencies, options = {}) {
         resolveWorkspaceArtifacts,
       })
     : null;
+  const requirementGateAssessment = assessRequirementGateRelevance({
+    message: options.message,
+    gate: requirementGate,
+    laneRequest,
+    resolvedTarget,
+  });
   const focusedChangeId = selectFocusedChangeId(projectRoot, laneRequest, resolvedTarget, activeChange);
   const taskState = focusedChangeId
     ? await listOpenSpecTaskWorkspace(projectRoot, { change: focusedChangeId }).catch(() => null)
@@ -1547,8 +1748,10 @@ async function buildRunContext(projectRoot, dependencies, options = {}) {
     next,
     loopFeatureList,
     requirementGate,
+    requirementGateAssessment,
     laneRequest,
     resolvedTarget,
+    runState,
   });
   const nextTask = compactTask(taskState?.nextTask ?? null);
   const lane = buildRunLane({
@@ -1560,7 +1763,56 @@ async function buildRunContext(projectRoot, dependencies, options = {}) {
     resolvedTarget,
     projectRoot,
   });
-  const effectiveRecommendation = withExecutionConfirmationChecklist(applyLaneToRecommendation(recommendation, lane));
+  const recommendationWithGateReminder = {
+    ...recommendation,
+    reason: appendRequirementGateReminder(
+      recommendation.reason,
+      requirementGateAssessment,
+      requirementGate,
+    ),
+  };
+  const effectiveRecommendation = withExecutionConfirmationChecklist(
+    applyLaneToRecommendation(recommendationWithGateReminder, lane),
+    { requirementGate },
+  );
+  const knowledgeSkillMatches = await resolveKnowledgeSkillMatches(projectRoot, {
+    message: options.message,
+    prompt: options.message,
+    recommendationTitle: effectiveRecommendation.title,
+    recommendationReason: effectiveRecommendation.reason,
+    activeChange,
+    nextTaskTitle: nextTask?.title,
+    relatedFiles: [
+      focusedChangeId ? `openprd/changes/${focusedChangeId}/tasks.md` : null,
+      activeChange ? `openprd/changes/${activeChange}` : null,
+    ].filter(Boolean),
+    limit: options.hookInject ? 4 : 3,
+  }).catch(() => ({ matched: [], summary: { matched: 0 } }));
+  const knowledgeAdoption = knowledgeSkillMatches.matched?.length > 0
+    ? await recordKnowledgeSkillAdoption(projectRoot, {
+      matches: knowledgeSkillMatches.matched,
+      stages: options.hookInject ? ['hit', 'referenced', 'injected'] : ['hit', 'referenced'],
+      source: options.hookInject ? 'run-context-hook' : 'run-context',
+      sessionId: lane.target?.sessionId ?? resolvedTarget?.sessionId ?? requirementGate?.sessionId ?? null,
+      promptPreview: options.message,
+    }).catch(() => null)
+    : null;
+  const knowledgeStageBump = {
+    hitCount: options.hookInject ? 1 : 1,
+    referencedCount: 1,
+    injectedCount: options.hookInject ? 1 : 0,
+  };
+  const renderedKnowledgeSkills = (knowledgeSkillMatches.matched ?? []).map((skill) => ({
+    ...skill,
+    adoption: skill.adoption
+      ? {
+        ...skill.adoption,
+        hitCount: Number(skill.adoption.hitCount ?? 0) + knowledgeStageBump.hitCount,
+        referencedCount: Number(skill.adoption.referencedCount ?? 0) + knowledgeStageBump.referencedCount,
+        injectedCount: Number(skill.adoption.injectedCount ?? 0) + knowledgeStageBump.injectedCount,
+      }
+      : skill.adoption,
+  }));
 
   const context = {
     ok: validation.valid,
@@ -1581,6 +1833,9 @@ async function buildRunContext(projectRoot, dependencies, options = {}) {
           promptPreview: requirementGate.promptPreview ?? null,
           intakeMode: requirementGate.intakeMode ?? null,
           sessionId: requirementGate.sessionId ?? null,
+          relevance: requirementGateAssessment.relevance,
+          matchedCurrentMessage: requirementGateAssessment.matchedCurrentMessage,
+          relevanceReason: requirementGateAssessment.reason,
         }
       : null,
     prdReviewState: next?.prdReviewState
@@ -1621,6 +1876,14 @@ async function buildRunContext(projectRoot, dependencies, options = {}) {
       : null,
     lane,
     recommendation: effectiveRecommendation,
+    knowledgeSkills: {
+      matched: renderedKnowledgeSkills,
+      summary: {
+        matched: renderedKnowledgeSkills.length,
+        hookInjected: Boolean(options.hookInject && renderedKnowledgeSkills.length > 0),
+        adoption: knowledgeAdoption?.summary ?? null,
+      },
+    },
     files: {
       runState: OPENPRD_HARNESS_RUN_STATE,
       iterations: OPENPRD_HARNESS_ITERATIONS,
@@ -1811,9 +2074,29 @@ async function verifyRunWorkspace(projectRoot, dependencies, options = {}) {
   }).catch((error) => ({
     ok: false,
     action: 'quality-knowledge-review',
-    skipped: false,
-    errors: [error instanceof Error ? error.message : String(error)],
+      skipped: false,
+      errors: [error instanceof Error ? error.message : String(error)],
   }));
+  const verificationRecommendation = buildVerificationRecommendation({
+    changeId: changeToVerify,
+    readiness,
+    workspaceAttention,
+    knowledgeReview,
+    qualityCheck,
+  });
+  const runState = await readRunState(projectRoot);
+  await writeRunState(projectRoot, {
+    ...runState,
+    lastVerificationAt: timestamp(),
+    lastVerification: {
+      ...readiness,
+      changeId: changeToVerify,
+      workspaceAttention,
+      knowledgeCandidateId: knowledgeReview?.candidateId ?? null,
+      qualityReportPath: qualityCheck?.reportPath ?? null,
+    },
+    lastRecommendation: verificationRecommendation,
+  });
   await appendJsonl(harnessFile(projectRoot, OPENPRD_HARNESS_ITERATIONS), {
     version: 1,
     at: timestamp(),
@@ -1836,6 +2119,7 @@ async function verifyRunWorkspace(projectRoot, dependencies, options = {}) {
     workspaceAttention,
     warnings,
     knowledgeReview,
+    recommendation: verificationRecommendation,
     errors,
   };
 }

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { buildArchitectureDiagramModel, buildProductFlowDiagramModel, renderDiagramMermaidFromModel } from './diagram-core.js';
 import { TBD_ZH, languagePolicyLines } from './language-policy.js';
+import { formatProductTypeDisplay, formatProductTypeQuestion, formatTemplatePackDisplay, getProductTypeSectionTitle } from './product-type-copy.js';
 import { timestamp } from './time.js';
 
 function isPlainObject(value) {
@@ -151,7 +152,7 @@ function buildTypeSpecificSection(productType, state, overrides) {
   if (productType === 'consumer') {
     return {
       kind: 'consumer',
-      title: '消费端专项',
+      title: getProductTypeSectionTitle('consumer'),
       fields: {
         persona: pickValue(overrides.persona, state.persona),
         segment: pickValue(overrides.segment, state.segment),
@@ -165,7 +166,7 @@ function buildTypeSpecificSection(productType, state, overrides) {
   if (productType === 'b2b') {
     return {
       kind: 'b2b',
-      title: 'B2B 专项',
+      title: getProductTypeSectionTitle('b2b'),
       fields: {
         buyer: pickValue(overrides.buyer, state.buyer),
         user: pickValue(overrides.user, state.user),
@@ -183,7 +184,7 @@ function buildTypeSpecificSection(productType, state, overrides) {
   if (productType === 'agent') {
     return {
       kind: 'agent',
-      title: 'Agent 专项',
+      title: getProductTypeSectionTitle('agent'),
       fields: {
         humanAgentContract: pickValue(overrides.humanAgentContract, state.humanAgentContract),
         autonomyBoundary: pickValue(overrides.autonomyBoundary, state.autonomyBoundary),
@@ -196,9 +197,9 @@ function buildTypeSpecificSection(productType, state, overrides) {
 
   return {
     kind: 'base',
-    title: '类型专项',
+    title: getProductTypeSectionTitle('base'),
     fields: {
-      note: '请选择产品类型，以启用对应的专项 PRD 模块。',
+      note: '请选择产品场景，以启用对应的专项 PRD 模块。',
     },
   };
 }
@@ -338,8 +339,8 @@ export function renderPrdMarkdown(snapshot) {
     ...languagePolicyLines(),
     `- 版本: ${snapshot.versionId}`,
     `- 负责人: ${snapshot.owner}`,
-    `- 产品类型: ${snapshot.productType ?? '未分类'}`,
-    `- 模板包: ${snapshot.templatePack}`,
+    `- 产品场景: ${formatProductTypeDisplay(snapshot.productType, { fallback: '待确认' })}`,
+    `- 场景模板: ${formatTemplatePackDisplay(snapshot.templatePack, { fallback: '待确认' })}`,
     `- 状态: ${snapshot.status}`,
     `- 生成时间: ${snapshot.createdAt}`,
     '',
@@ -348,7 +349,7 @@ export function renderPrdMarkdown(snapshot) {
       ['负责人', sections.meta.owner],
       ['状态', sections.meta.status],
       ['版本', sections.meta.version],
-      ['产品类型', sections.meta.productType],
+      ['产品场景', formatProductTypeDisplay(snapshot.productType, { fallback: '待确认' })],
       ['日期', sections.meta.date],
     ]),
     renderSection('问题', [
@@ -421,7 +422,7 @@ const BASE_REQUIRED_FIELD_DESCRIPTORS = [
   { section: 'meta', path: 'meta.owner', label: '负责人', prompt: '谁负责这份 PRD？' },
   { section: 'meta', path: 'meta.version', label: '版本', prompt: '这份 PRD 从哪个版本开始？' },
   { section: 'meta', path: 'meta.status', label: '状态', prompt: '当前 PRD 状态是什么？' },
-  { section: 'meta', path: 'meta.productType', label: '产品类型', prompt: '这是 consumer、b2b 还是 agent 产品？' },
+  { section: 'meta', path: 'meta.productType', label: '产品场景', prompt: formatProductTypeQuestion() },
   { section: 'problem', path: 'problem.problemStatement', label: '问题陈述', prompt: '我们要解决什么问题？' },
   { section: 'problem', path: 'problem.whyNow', label: '为什么是现在', prompt: '为什么现在是解决这个问题的合适时机？' },
   { section: 'problem', path: 'problem.evidence', label: '证据', prompt: '有哪些证据支持这个问题？' },

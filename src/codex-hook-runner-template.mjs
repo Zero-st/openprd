@@ -423,7 +423,7 @@ function reviewPolicyAllowsSilentRecord(policy) {
 }
 
 function resolveRequirementApprovalPolicy(prompt, intent = {}) {
-  const suppressExtraConfirmation = Boolean(intent?.noReviewRequested || intent?.noConfirmationRequested);
+  const suppressExtraConfirmation = Boolean(intent?.noConfirmationRequested);
   const explicitExecution = Boolean(intent?.explicitExecution);
   return normalizeRequirementApprovalPolicy({
     mode: 'decision-points',
@@ -752,7 +752,7 @@ function changeRequirementSummary(root, changeId) {
 }
 
 function runOpenPrdContext(cwd, prompt = null) {
-  const args = ['run', '.', '--context', '--json'];
+  const args = ['run', '.', '--context', '--json', '--hook-inject'];
   if (String(prompt || '').trim()) {
     args.push('--message', String(prompt).trim());
   }
@@ -781,68 +781,103 @@ function runOpenPrdContext(cwd, prompt = null) {
   };
 }
 
+function knowledgeSkillContextLines(knowledgeSkills) {
+  const matched = Array.isArray(knowledgeSkills?.matched) ? knowledgeSkills.matched : [];
+  if (matched.length === 0) {
+    return [];
+  }
+  const lines = [
+    `项目级 Skill: 自动命中 ${matched.length} 个，并已加入当前上下文`,
+  ];
+  for (const skill of matched.slice(0, 3)) {
+    lines.push(`- ${skill.skillName}: ${skill.matchSummary || '命中当前上下文'}`);
+    if (skill.description) {
+      lines.push(`  说明: ${skill.description}`);
+    }
+    if (Array.isArray(skill.touchedFiles) && skill.touchedFiles.length > 0) {
+      lines.push(`  相关文件: ${skill.touchedFiles.slice(0, 4).join('；')}`);
+    }
+    if (skill.adoption) {
+      lines.push(`  复用指标: 命中 ${skill.adoption.hitCount || 0} / 引用 ${skill.adoption.referencedCount || 0} / 注入 ${skill.adoption.injectedCount || 0}`);
+    }
+  }
+  return lines;
+}
+
 function renderRunContextText(result) {
   const lines = [
-    'OpenPrd 运行上下文',
-    '项目: ' + result.projectRoot,
-    '验证: ' + (result.validation?.valid ? '通过' : '失败'),
+    '当前进展参考',
+    '当前项目: ' + result.projectRoot,
+    '基础检查: ' + (result.validation?.valid ? '通过' : '失败'),
   ];
+  if (result.activeRequirementGate) {
+    const gateStatus = result.activeRequirementGate.status ?? 'active';
+    const gateSuffix = result.activeRequirementGate.relevance === 'background' ? '（仅背景提醒）' : '';
+    lines.push('当前处理阶段: ' + gateStatus + gateSuffix);
+  }
   if (result.activeChange) {
-    lines.push('激活变更: ' + result.activeChange);
+    const label = result.recommendation?.type === 'requirement-intake' ? '历史聚焦事项' : '当前聚焦事项';
+    lines.push(label + ': ' + result.activeChange);
   }
   if (result.lane?.summary) {
-    lines.push('执行流: ' + result.lane.summary);
+    lines.push('当前处理路径: ' + result.lane.summary);
   }
   if (result.taskSummary) {
-    lines.push('任务: ' + result.taskSummary.completed + '/' + result.taskSummary.total + ' 完成，' + result.taskSummary.pending + ' 待处理，' + result.taskSummary.blocked + ' 阻塞');
+    lines.push('后续任务进度: ' + result.taskSummary.completed + '/' + result.taskSummary.total + ' 完成，' + result.taskSummary.pending + ' 待处理，' + result.taskSummary.blocked + ' 阻塞');
+    if (result.taskSummary.implementation) {
+      lines.push('待落地任务: ' + result.taskSummary.implementation.completed + '/' + result.taskSummary.implementation.total + ' 完成，' + result.taskSummary.implementation.pending + ' 待处理');
+    }
   }
   if (result.discovery) {
-    lines.push('持续发现: ' + result.discovery.runId + ' 已覆盖 ' + result.discovery.summary.covered + '/' + result.discovery.summary.total + '，待处理 ' + result.discovery.summary.pending);
+    lines.push('调研进度: ' + result.discovery.runId + ' 已覆盖 ' + result.discovery.summary.covered + '/' + result.discovery.summary.total + '，待处理 ' + result.discovery.summary.pending);
   }
+  lines.push(...knowledgeSkillContextLines(result.knowledgeSkills));
+  lines.push('对外表达: 面向用户时，请优先说“本次调整”“后续任务”“继续落地”“完成后检查”这类人话，不要直接复述内部编号、命令、路径、版本号或流程术语。');
   const recommendation = result.recommendation || {};
-  lines.push('下一步类型: ' + recommendation.type);
-  lines.push('下一步: ' + recommendation.title);
-  lines.push('原因: ' + recommendation.reason);
-  lines.push('建议只读命令: ' + recommendation.command);
+  lines.push('建议下一步: ' + recommendation.title);
+  lines.push('这样安排的原因: ' + recommendation.reason);
   if (recommendation.preparationCommand || recommendation.executionCommand || recommendation.commitCommand) {
-    lines.push('执行门槛: 仅当用户当前明确要求开发、实现、继续任务、深度调研、深度对标、复刻落地或提交时使用；如果还需要执行授权，先展示执行确认清单，规划、梳理、分析、审查类请求保持只读。');
+    lines.push('开始动手前提: 只有在用户明确要求继续落地、实现、修复、深挖或提交时，才继续往下做；如果还缺这一步，就先用人话说明范围和影响。');
   }
   const checklist = recommendation.executionConfirmationChecklist;
   if (checklist?.required) {
-    lines.push('执行确认清单:');
+    lines.push((checklist.title || '开始动手前先确认这些') + ':');
     if (checklist.objective) {
-      lines.push('- 本轮目标: ' + checklist.objective);
+      lines.push('- 这次要做什么: ' + checklist.objective);
     }
     if (checklist.scope?.length > 0) {
-      lines.push('- 执行范围: ' + checklist.scope.join('；'));
+      lines.push('- 这次范围: ' + checklist.scope.join('；'));
     }
     if (checklist.implementationItems?.length > 0) {
-      lines.push('- 将执行: ' + checklist.implementationItems.join('；'));
+      lines.push('- 我会这样推进: ' + checklist.implementationItems.join('；'));
     }
     if (checklist.outOfScope?.length > 0) {
-      lines.push('- 不做: ' + checklist.outOfScope.join('；'));
+      lines.push('- 这次先不做: ' + checklist.outOfScope.join('；'));
     }
     if (checklist.verification?.length > 0) {
-      lines.push('- 验证: ' + checklist.verification.join('；'));
+      lines.push('- 完成后会检查: ' + checklist.verification.join('；'));
     }
     if (checklist.risks?.length > 0) {
-      lines.push('- 风险: ' + checklist.risks.join('；'));
+      lines.push('- 需要提前知道: ' + checklist.risks.join('；'));
     }
     if (checklist.confirmationPrompt) {
-      lines.push('- 确认方式: ' + checklist.confirmationPrompt);
+      lines.push('- 如果要我现在继续: ' + checklist.confirmationPrompt);
     }
   }
   if (recommendation.preparationCommand) {
-    lines.push('准备命令: ' + recommendation.preparationCommand);
+    lines.push('内部准备参考: ' + recommendation.preparationCommand);
   }
   if (recommendation.executionCommand) {
-    lines.push('执行命令: ' + recommendation.executionCommand);
+    lines.push('内部执行参考: ' + recommendation.executionCommand);
   }
   if (recommendation.commitCommand) {
-    lines.push('提交命令: ' + recommendation.commitCommand);
+    lines.push('内部提交参考: ' + recommendation.commitCommand);
   }
-  lines.push('验证命令: ' + recommendation.verifyCommand);
-  lines.push('状态文件: ' + (result.files?.runState || '.openprd/harness/run-state.json'));
+  if (recommendation.loop?.worktreeRecommended) {
+    lines.push('环境建议: 最好放到单独环境里继续，避免和别的事项串线。');
+  }
+  lines.push('内部检查参考: ' + recommendation.verifyCommand);
+  lines.push('内部状态参考: ' + (result.files?.runState || '.openprd/harness/run-state.json'));
   return lines.filter(Boolean).join('\n');
 }
 
@@ -853,10 +888,10 @@ function analyzePromptIntent(prompt) {
   const continuationTaskHandle = text.match(/\b[a-z0-9._-]+:T\d{3}\.\d{2}:[a-z0-9._-]+\b/i)?.[0] ?? null;
   const continuationWorkUnitId = text.match(/\bwu-[a-z0-9._-]+\b/i)?.[0] ?? null;
   const promptReviewCommand = parseReviewMarkCommand(text);
-  const continuationRequest = /(继续(这个|这条|当前)?(对话|任务|会话|记录|历史)?|续做|接着做|继续执行|继续推进)/i.test(text)
+  const continuationVerbMatched = /(?:(?:继续|续做|接着做|继续执行|继续推进)(?:这个|这条|当前)?\s*(?:对话|任务|会话|记录|历史|Codex\s*任务)|(?:对话|任务|会话|记录|历史|Codex\s*任务).{0,6}(?:继续|续做|接着做|继续执行|继续推进)|^(?:继续|续做|接着做|继续执行|继续推进)\s*(?::|：))/i.test(text);
+  const continuationRequest = continuationVerbMatched
     || Boolean(
-      continuationSessionId
-        || continuationTaskHandle
+      continuationTaskHandle
         || (continuationWorkUnitId && !promptReviewCommand)
     );
   const githubRepoPattern = /(?:https?:\/\/)?github\.com\/[^\s/]+\/[^\s/#?]+|(?:^|[\s(])[\w.-]+\/[\w.-]+(?=$|[\s)#?])/i;
@@ -930,18 +965,21 @@ function analyzePromptIntent(prompt) {
     /按钮|文案|颜色|圆角|位置|间距|字号|图标|标题|空格|标点|label|copy/i,
     /从.+(改到|移到|移动到|换到|变成|改成|改为).+/,
   ];
-  const l2ScopePatterns = [
+  const l2StructuralScopePatterns = [
     /模块/,
     /入口/,
     /流程/,
+    /导入流/,
     /编排/,
+    /workflow/i,
+    /wizard/i,
+  ];
+  const l2StrategicScopePatterns = [
     /一站式/,
     /团队搭建/,
     /agent\s*市场/i,
     /skill\s*library/i,
     /cli\s*库/i,
-    /workflow/i,
-    /wizard/i,
     /权限/,
     /审批/,
     /计费/,
@@ -951,6 +989,34 @@ function analyzePromptIntent(prompt) {
     /迁移/,
     /跨系统/,
     /(AI|模型).{0,8}(接入|集成|编排)/i,
+  ];
+  const structuralExpansionIntensityPatterns = [
+    /串联/,
+    /一站式/,
+    /整体/,
+    /全链路/,
+    /端到端/,
+    /体系/,
+    /平台/,
+    /多个/,
+  ];
+  const featurePlanningPatterns = [
+    /需求/,
+    /方案/,
+    /规划/,
+    /产品/,
+  ];
+  const capabilityCreationPatterns = [
+    /新增/,
+    /增加/,
+    /新建/,
+    /做(一个|个)?/,
+    /支持/,
+    /提供/,
+    /搭建/,
+    /引入/,
+    /接入/,
+    /集成/,
   ];
   const crossSystemRiskPatterns = [
     /支付|登录|注册|账号|权限|订单|回调|风控|退款|计费|同步|迁移|数据库|schema|协议|网关|跨系统|第三方|云服务|OSS|CDN|MCP|SDK|CLI/i,
@@ -1008,6 +1074,7 @@ function analyzePromptIntent(prompt) {
   ];
   const readOnlyPatterns = [
     /看看/,
+    /看下(一下)?/,
     /你看/,
     /规划/,
     /分析/,
@@ -1030,14 +1097,11 @@ function analyzePromptIntent(prompt) {
   const bugfixOrDiagnostic = /诊断包|报错|错误|异常|崩溃|bug|问题|排查|定位|根因|复现|日志|故障/i.test(text)
     || /失败.{0,20}(原因|根因|排查|定位|修|修复|处理|解决)|(?:原因|根因|排查|定位).{0,20}失败/.test(text);
   const tinyEdit = tinyEditPatterns.some((pattern) => pattern.test(text));
-  const l2ScopeMatched = l2ScopePatterns.some((pattern) => pattern.test(text));
   const crossSystemRiskMatched = crossSystemRiskPatterns.some((pattern) => pattern.test(text));
-  const simpleConcrete = text.length <= 80
-    && simpleConcretePatterns.some((pattern) => pattern.test(text))
-    && !l2ScopeMatched;
+  const localUiScopeMatched = /(按钮|文案|颜色|圆角|位置|间距|字号|图标|标题|空格|标点|label|copy|toast|placeholder|样式|页面|界面|布局|信息架构|导航|列表|详情页|设置页)/i.test(text);
   const reviewContinuationRequested = reviewContinuationPatterns.some((pattern) => pattern.test(text));
   const explicitExecution = internalOpenPrdExecution
-    || continuationRequest
+    || continuationVerbMatched
     || reviewContinuationRequested
     || explicitExecutionPatterns.some((pattern) => pattern.test(text));
   const implementationConfirmation = reviewContinuationRequested
@@ -1060,10 +1124,29 @@ function analyzePromptIntent(prompt) {
   const visualReview = /效果图|实现截图|视觉对比|视觉评审|对标效果图|复刻/i.test(text);
   const directBugfixExecution = explicitExecution && bugfixOrDiagnostic;
   const newFeatureVerbMatched = /(新增|增加|新建)/.test(text);
-  const localUiScopeMatched = /(按钮|文案|颜色|圆角|位置|间距|字号|图标|标题|空格|标点|label|copy|toast|placeholder|样式|页面|界面|布局|信息架构|导航|列表|详情页|设置页)/i.test(text);
+  const capabilityCreationMatched = capabilityCreationPatterns.some((pattern) => pattern.test(text));
+  const featurePlanningMatched = featurePlanningPatterns.some((pattern) => pattern.test(text));
+  const structuralL2ScopeMatchCount = l2StructuralScopePatterns.filter((pattern) => pattern.test(text)).length;
+  const strategicL2ScopeMatched = l2StrategicScopePatterns.some((pattern) => pattern.test(text));
+  const structuralExpansionMatched = structuralL2ScopeMatchCount >= 2
+    || (structuralL2ScopeMatchCount >= 1
+      && (structuralExpansionIntensityPatterns.some((pattern) => pattern.test(text)) || (capabilityCreationMatched && !localUiScopeMatched)));
+  const l2ScopeMatched = strategicL2ScopeMatched || structuralExpansionMatched;
+  const simpleConcrete = text.length <= 80
+    && simpleConcretePatterns.some((pattern) => pattern.test(text))
+    && !l2ScopeMatched;
   const requirementSignalMatched = requirementRoutingSignalsStrong.some((pattern) => pattern.test(text))
     || (requirementRoutingSignalsWeak.some((pattern) => pattern.test(text))
       && requirementChangeIntentSignals.some((pattern) => pattern.test(text)));
+  const l2FeatureExpansionMatched = !localUiScopeMatched
+    && (
+      (capabilityCreationMatched && (strategicL2ScopeMatched || structuralExpansionMatched))
+      || (newFeatureVerbMatched && text.length > 18)
+    );
+  const l2PlanningRequestMatched = !readOnly
+    && featurePlanningMatched
+    && requirementChangeIntentSignals.some((pattern) => pattern.test(text))
+    && (strategicL2ScopeMatched || structuralExpansionMatched);
   const l1OptimizationMatched = l1OptimizationPatterns.some((pattern) => pattern.test(text))
     && /(页面|界面|视觉|样式|布局|信息架构|交互|体验|流程|入口|导航|表单|设置页|列表|详情页)/i.test(text);
   const l0AdjustmentMatched = l0AdjustmentPatterns.some((pattern) => pattern.test(text))
@@ -1083,17 +1166,15 @@ function analyzePromptIntent(prompt) {
   const browserSafetyRequest = /(computer use|browser use|浏览器|browser|网页|页面|窗口|标签页|tab|profile)/i.test(text)
     && /(点击|输入|提交|登录|注销|退出|支付|关闭|send|submit|type|click|switch account|切换账号)/i.test(text);
   const productCopyRequest = /(文案|copy|错误文案|空状态|成功提示|按钮文案|提示语|toast|placeholder|设置项文案|国际化|i18n|locales|translations|localizable)/i.test(text);
+  const l2RequirementCandidate = (bugfixOrDiagnostic && crossSystemRiskMatched)
+    || l2FeatureExpansionMatched
+    || l2PlanningRequestMatched;
   const requirementTier = !internalOpenPrdExecution
-    ? ((requirementSignalMatched || (bugfixOrDiagnostic && explicitExecution))
+    ? (l2RequirementCandidate
         && !tinyEdit
         && !simpleConcrete
         && !visualMockupRequest
         && !(readOnly && !explicitExecution)
-        && (
-          (requirementSignalMatched && l2ScopeMatched)
-          || (bugfixOrDiagnostic && crossSystemRiskMatched)
-          || (newFeatureVerbMatched && !localUiScopeMatched)
-        )
       ? 'l2'
       : (!visualMockupRequest
           && (!readOnly || explicitExecution)
@@ -1395,27 +1476,34 @@ function evaluateRequirementGateProgress(root, sessionId = null) {
   const taskSummary = activeChange ? readLocalTaskSummary(root, activeChange) : null;
   const hasTaskBreakdown = Boolean(activeChange && Number(taskSummary?.total ?? 0) > 0);
   const approvalPolicy = requirementApprovalPolicy(gate);
+  const clarificationConfirmed = requirementWritePathExplicitlyAuthorized(gate);
   let nextStep = 'implementation-ready';
-  let reason = 'PRD 评审与任务拆解已就绪；如果当前需求原本就明确要求实现，可直接继续执行，否则等待一句明确的执行指令。';
+  let reason = '这版需求和后续任务都已经准备好了；如果用户原本就明确要继续做，就直接往下推进，否则再补一句清楚的人话授权。';
   if (!review.versionId) {
-    nextStep = 'prd-review-required';
-    reason = '当前还没有本轮最新 PRD 评审产物，先 synthesize 出稳定 review artifact，再等待用户评审。';
+    nextStep = clarificationConfirmed ? 'prd-synthesis-required' : 'clarification-confirmation-required';
+    reason = clarificationConfirmed
+      ? (
+          reviewPolicyAllowsSilentRecord(approvalPolicy)
+            ? '用户已明确表示不需要再停下来确认，本轮可以直接整理需求事实、生成这版确认稿，并继续后面的整理步骤。'
+            : '当前需求摘要已经确认，下一步把已确认内容整理成可确认的需求稿。'
+        )
+      : '当前还缺需求摘要确认。先在对话里按“需求判断 / 需求理解 / 功能范围 / 技术方案”整理结构化摘要，其中“功能范围”和“技术方案”优先用 Markdown 表格；用户没确认前，不要直接把核心需求写成既定事实。';
   } else if (review.status === 'needs-revision') {
     nextStep = 'prd-review-required';
-    reason = '当前 PRD review artifact 已标记为需要调整，不能继续生成 change 或实现。';
+    reason = '当前这版需求确认稿已经被标记为需要调整，先改完再继续后面的整理或实现。';
   } else if (review.status !== 'confirmed') {
     nextStep = reviewPolicyAllowsSilentRecord(approvalPolicy)
       ? 'review-recording-required'
       : 'prd-review-required';
     reason = reviewPolicyAllowsSilentRecord(approvalPolicy)
-      ? '当前稳定 PRD 评审稿已经生成。由于用户一开始已明确要求直接做且不再额外评审/确认，本轮可以直接记录这版稳定 review artifact，再继续 change 和 tasks。'
-      : '当前 PRD review artifact 还没有被用户确认，不能把实现授权当成 review 确认。';
+      ? '这版需求确认稿已经生成。由于用户已经明确表示不需要再停下来确认，本轮可以直接记录这次确认结果，再继续整理本次调整和后续任务。'
+      : '这版需求确认稿还没有得到用户认可，不能把“请帮我实现/继续实现”当成已经确认这版内容。';
   } else if (!activeChange) {
     nextStep = 'change-generation-required';
-    reason = 'PRD 评审已确认，下一步先生成 OpenPrd change。';
+    reason = '这版需求已经确认，下一步先整理本次调整范围。';
   } else if (!hasTaskBreakdown) {
     nextStep = 'task-breakdown-required';
-    reason = 'OpenPrd change 已存在，但还缺任务拆解，不能直接进入实现。';
+    reason = '本次调整范围已经立起来了，但还没拆成可直接执行的后续任务。';
   }
   return {
     runContext: parsed,
@@ -1479,11 +1567,16 @@ function silentReviewActionAuthorizationFor(gate, progress, prompt) {
 
 function holdRequirementGate(root, prompt, progress, sessionId = null, extra = {}) {
   const reviewActionAuthorization = extra.reviewActionAuthorization ?? null;
-  return updateRequirementGate(root, {
+  const patch = {
     status: extra.status ?? progress.nextStep,
     confirmationPreview: preview(prompt, 500),
     reviewActionAuthorization,
-  }, sessionId);
+  };
+  if (extra.clarificationConfirmedAt) {
+    patch.clarificationConfirmedAt = extra.clarificationConfirmedAt;
+    patch.clarificationConfirmationPreview = extra.clarificationConfirmationPreview ?? preview(prompt, 500);
+  }
+  return updateRequirementGate(root, patch, sessionId);
 }
 
 function isImplementationAdvanceIntent(intent) {
@@ -1562,6 +1655,28 @@ function isMutationPayload(payload, risk) {
     || /\*\*\* Begin Patch/.test(text);
 }
 
+function captureSourceFromCommand(command) {
+  return readCliFlagValue(command, '--source');
+}
+
+function isNonSemanticCaptureCommand(command) {
+  return /openprd\s+capture\b/i.test(command)
+    && captureSourceFromCommand(command) === 'agent-normalized';
+}
+
+function gateHasClarificationConfirmation(gate) {
+  return Boolean(gate?.clarificationConfirmedAt || gate?.status === 'clarification-confirmed');
+}
+
+function requirementWritePathExplicitlyAuthorized(gate) {
+  return gateHasClarificationConfirmation(gate)
+    || reviewPolicyAllowsSilentRecord(requirementApprovalPolicy(gate));
+}
+
+function isRequirementWritePathMutation(command) {
+  return /openprd\s+(capture|classify|synthesize|diagram)\b/i.test(command);
+}
+
 function isAllowedDuringRequirementGate(root, payload, gate, sessionId = null) {
   const text = payloadText(payload);
   const command = commandText(payload);
@@ -1572,18 +1687,22 @@ function isAllowedDuringRequirementGate(root, payload, gate, sessionId = null) {
     /openprd\s+run\s+\.\s+--context\b/i,
     /openprd\s+run\s+\.\s+--verify\b/i,
     /openprd\s+clarify\b/i,
-    /openprd\s+capture\b/i,
-    /openprd\s+classify\b/i,
     /openprd\s+interview\b/i,
-    /openprd\s+synthesize\b/i,
-    /openprd\s+diagram\b/i,
-    /openprd\s+review-presentation\b/i,
     /openprd\s+standards\s+.*--verify/i,
     /openprd\s+quality\s+.*--verify/i,
     /openprd\s+doctor\b/i,
   ];
   if (alwaysAllowed.some((pattern) => pattern.test(text))) {
     return true;
+  }
+  if (/openprd\s+capture\b/i.test(command)) {
+    return isNonSemanticCaptureCommand(command) || requirementWritePathExplicitlyAuthorized(gate);
+  }
+  if (/openprd\s+(classify|synthesize|diagram)\b/i.test(command)) {
+    return requirementWritePathExplicitlyAuthorized(gate);
+  }
+  if (/openprd\s+review-presentation\b/i.test(command)) {
+    return /--template\b/i.test(command) || Boolean(progress.review.versionId);
   }
   if (/openprd\s+review\b/i.test(command)) {
     if (!/--mark\b/i.test(command)) {
@@ -1792,8 +1911,39 @@ function composeHookContext(root, intent = null, gate = null, progress = null, s
 }
 
 function runOpenPrd(args, cwd) {
-  const command = process.env.OPENPRD_CLI || 'openprd';
-  const result = spawnSync(command, args, {
+  const configuredCommand = String(process.env.OPENPRD_CLI || 'openprd').trim() || 'openprd';
+  const jsEntry = /\.(?:c|m)?js$/i.test(configuredCommand);
+  let command = configuredCommand;
+  let commandArgs = args;
+  if (jsEntry) {
+    const candidates = [];
+    const addCollapsedPackageCandidate = (candidatePath) => {
+      if (!candidatePath) {
+        return;
+      }
+      const normalized = path.resolve(candidatePath);
+      const binDir = path.dirname(normalized);
+      const packageDir = path.dirname(binDir);
+      const packageName = path.basename(packageDir);
+      if (path.basename(binDir) === 'bin' && packageName === 'openprd') {
+        candidates.push(path.join(path.dirname(packageDir), 'bin', 'openprd.js'));
+      }
+    };
+    if (path.isAbsolute(configuredCommand)) {
+      candidates.push(configuredCommand);
+      addCollapsedPackageCandidate(configuredCommand);
+    } else {
+      candidates.push(path.resolve(cwd, configuredCommand));
+      candidates.push(path.resolve(configuredCommand));
+      addCollapsedPackageCandidate(path.resolve(cwd, configuredCommand));
+      addCollapsedPackageCandidate(path.resolve(configuredCommand));
+    }
+    candidates.push(path.join(cwd, 'bin', 'openprd.js'));
+    const resolvedEntry = candidates.find((candidate) => candidate && fs.existsSync(candidate));
+    command = process.execPath;
+    commandArgs = [resolvedEntry || configuredCommand, ...args];
+  }
+  const result = spawnSync(command, commandArgs, {
     cwd,
     encoding: 'utf8',
     timeout: 15000,
@@ -1994,7 +2144,7 @@ function requirementGateMessage(intent, gate) {
       'The user is asking for an image asset such as a cover image, poster, illustration, icon, sticker, visual mockup, or effect image, not code implementation.',
       'For logo, icon, avatar, badge, and similar development assets, default to a standalone asset: full-frame single subject with no extra UI frame, card shell, device mockup, or presentation container unless the user explicitly asked for one.',
       'Do not create temporary HTML/SVG/CSS files for this image unless the user explicitly requested that format.',
-      'Use Codex native Image 2 to generate the image; keep implementation, PRD review, and visual-compare for later explicit confirmation.',
+      'Use `imagegen`, which is Codex native Image 2, to generate the image; keep implementation, PRD review, and visual-compare for later explicit confirmation.',
     ].join('\n');
   }
   const status = gateBlocksImplementation ? 'active' : 'opened';
@@ -2003,15 +2153,15 @@ function requirementGateMessage(intent, gate) {
     'This prompt looks like a likely 新功能/新流程方案 (L2), so the heavy requirement-intake lane is active. Do not decide from fixed keywords; first use $openprd-requirement-intake to classify the user-visible requirement type by impact, unknowns, decision cost, and validation cost.',
     'Keep this mapping visible for internal review: 快速修正=L0, 现有功能优化=L1, 新功能/新流程方案=L2.',
     'L0 and L1 stay on lightweight paths and should not be forced through formal PRD/review/change/tasks unless the scope expands.',
-    'If the requirement type is 新功能/新流程方案 (L2), do not edit implementation files yet and proceed through PRD/review/change/tasks with the appropriate base/consumer/b2b/agent PRD lens.',
+    'If the requirement type is 新功能/新流程方案 (L2), do not edit implementation files yet and proceed through PRD/review/change/tasks with the appropriate PRD scene lens: 通用场景、面向个人消费者场景、面向企业服务场景，或以 Agent 为主要使用场景。 Keep raw enum values such as base / consumer / b2b / agent for internal commands or records only; do not surface them to the user unless truly necessary.',
     reviewPolicyAllowsSilentRecord(approvalPolicy)
-      ? 'Decision-point policy: clarify the requirement, capture user answers, synthesize the PRD, record the exact current stable review artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.'
-      : 'Decision-point policy: clarify the requirement, capture user answers, synthesize the PRD, wait for a human decision on the stable review artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.',
+      ? 'Decision-point policy: because the user explicitly said there is no need for any confirmation stop, you may skip the requirement-summary confirmation stop, write back the requirement facts, synthesize the PRD, record the exact current stable review artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.'
+      : 'Decision-point policy: first output a short structured requirement summary in chat with 需求判断 / 需求理解 / 功能范围 / 技术方案, where 功能范围 and 技术方案 should prefer Markdown tables; wait for the user to confirm that summary, then write back confirmed facts, synthesize the PRD, wait for a human decision on the stable review artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.',
     reviewPolicyAllowsSilentRecord(approvalPolicy)
-      ? 'This lane is in silent-record mode because the user upfront asked to implement without another review stop. You may record only the exact current version, digest, and work unit.'
-      : 'Review-artifact confirmation and implementation authorization are different gates: do not treat "可以开做" as permission to run openprd review --mark confirmed.',
+      ? 'This lane is in silent-record mode only because the user explicitly said there is no need for any further review or confirmation stop. Plain "请帮我实现" is not enough; you may record only the exact current version, digest, and work unit.'
+      : 'Requirement-summary confirmation, review-artifact confirmation, and implementation authorization are different gates: do not treat "可以开做", "继续实现", plain "请帮我实现", or "不需要评审" as permission to skip them.',
     'If the original request already asked to implement, execution can continue once the active approval policy and tasks are ready; otherwise wait for a clear execution request.',
-    'Recommended next action: write a short 需求类型判断 in chat with both 需求类型 and 内部路由码, then for 新功能/新流程方案 (L2) run openprd clarify ., summarize target, scope, out-of-scope, and acceptance in chat, then ask for confirmation. Do not open a clarification HTML page; the formal HTML review happens after synthesize/review.',
+    'Recommended next action: write a short 需求类型判断 in chat, and by default merge the route into the label as 需求类型：新功能/新流程方案（L2）; only add a separate 内部路由码 when internal debugging truly benefits. Then run openprd clarify ., summarize the requirement in chat using 需求判断 / 需求理解 / 功能范围 / 技术方案, prefer Markdown tables for 功能范围 and 技术方案, ask for confirmation, and only after that write back confirmed facts. Do not open a clarification HTML page; the formal HTML review happens after synthesize/review.',
   ].join('\n');
 }
 
@@ -2019,6 +2169,7 @@ function lightweightRequirementMessage(intent) {
   if (intent?.requirementTier === 'l0') {
     return [
       'OpenPrd 轻量需求路径: 当前更接近快速修正 (L0)。',
+      '先在 chat 用短格式写出“需求类型 / 理由 / 推荐下一步”，并默认写成“需求类型：快速修正（L0）”；只有内部排障确实需要时，才额外单列“内部路由码”。',
       '直接处理并事后说明即可，不打开正式 PRD/review/change/tasks。',
       '优先做最小足够验证，并用 1-2 句说明本轮特别需要强化的测试点；默认不要求正式测试报告。',
       '如果过程中暴露出跨系统依赖、支付/账号/权限/回调等高风险因素，再升级到 L2 重流程。',
@@ -2027,6 +2178,7 @@ function lightweightRequirementMessage(intent) {
   if (intent?.requirementTier === 'l1') {
     return [
       'OpenPrd 轻量需求路径: 当前更接近现有功能优化 (L1)。',
+      '先在 chat 用短格式写出“需求类型 / 理由 / 推荐下一步”，并默认写成“需求类型：现有功能优化（L1）”，再给 3-5 行 mini-plan；只有内部排障确实需要时，才额外单列“内部路由码”。',
       '先在对话里给 3-5 行 mini-plan，至少写清目标、范围内、范围外和验证方式。',
       '默认不要打开正式 PRD/review/change/tasks；只有在 mini-plan 暴露新决策缺口、跨系统风险或范围升级时，才提升到 L2 重流程。',
       '验证采用最小足够组合即可，重点说明需要强化测试的地方；默认不要求正式测试报告。',
@@ -2044,10 +2196,11 @@ function visualMockupMessage(intent) {
   }
   return [
     '当前用户要的是图片内容生成，例如图片、封面图、配图、海报、插画、图标、贴纸、头像、banner、主视觉/KV、运营图、效果图、视觉稿或 mockup。',
-    '默认直接调用 Codex 原生 Image 2 生成图片；除非用户明确指定 HTML、SVG、CSS、Canvas、代码稿或可编辑矢量/source artifact，不要改用临时 HTML/SVG/CSS 再截图。',
+    '默认直接调用 `imagegen`，也就是 Codex 原生 Image 2，来生成图片；除非用户明确指定 HTML、SVG、CSS、Canvas、代码稿或可编辑矢量/source artifact，不要改用临时 HTML/SVG/CSS 再截图。',
     '对 logo、icon、avatar、badge 等开发素材，如果用户没有明确要求 mockup、场景图、设备框、卡片承载、名片/包装展示或参考界面复刻，默认按独立素材输出（standalone asset）处理：使用全画布单主体，不额外添加 UI frame、卡片、设备壳、名片、桌面陈列、手持实拍或其他展示容器。',
     '只有当用户明确要求 mockup、场景化效果图、容器化呈现，或参考图本身就包含这些承载结构时，才生成对应的容器或场景。',
-    'OpenPrd review.html 只用于需求评审，visual-compare 只用于实现阶段视觉证据：已有参考图时做效果图/实现截图对比，无参考图但改动界面时做修改前/修改后自检。',
+    '只有在实际发生 `imagegen` 调用后，才能汇报生图结果、失败或限流；未调用 `imagegen` 前，不要声称“生图限流”或“生图失败”。',
+    'OpenPrd review.html 只用于需求评审，visual-compare 只用于实现阶段视觉证据：已有参考图时做效果图/实现截图对比，无参考图但改动界面时做修改前/修改后自检；局部细节优先补局部焦点证据板，并行优化方向优先补并行实验证据板。',
   ].join('\n');
 }
 
@@ -2059,13 +2212,13 @@ function largeUiVisualDirectionMessage(intent) {
     'OpenPrd 大界面改动视觉方案评审:',
     '位置: 需求分流之后、PRD 定稿或实现开工之前；它不同于 review.html，也不同于实现后的 visual-compare。',
     '判断: 会明显改变信息架构、核心布局、主视觉、关键路径、组件层级/密度，或用户需要先选设计方向时触发。',
-    '步骤: 用 Codex Computer Use 进入产品内对应功能并截当前真实界面；基于截图调用 Codex 原生 Image 2 做图生图，至少生成 3 个不同设计思想方向；把效果图横向拼成一张大图，每张左上角标注 1/2/3，并保存到 .openprd/harness/visual-reviews/。',
+    '步骤: 用 Codex Computer Use 进入产品内对应功能并截当前真实界面；基于截图调用 `imagegen`（Codex 原生 Image 2）做图生图，至少生成 3 个不同设计思想方向；把效果图横向拼成一张大图，每张左上角标注 1/2/3，并保存到 .openprd/harness/visual-reviews/。',
     '交互: 把横向大图展示给用户评审确认；用户确认方向前，不进入大 UI 实现，也不要声称界面方案已定。',
   ].join('\n');
 }
 
 function codexConfirmationReplyRule() {
-  return 'Codex UI 规则: 只有当前 approval policy 仍然需要人类对稳定 review artifact 做决定时，才在 final answer 里停下来请求确认；如果 review 已确认且 tasks 已就绪，但还需要执行授权，必须先用“执行确认清单”列出本轮目标、将执行内容、不做事项、验证方式和已知风险，再请求明确确认；不要只要求用户回复一句确认。如果用户贴的是 review 页复制出来的“认可并继续”文案，先记录精确 review artifact，再继续当前 OpenPrd 下一步；不要在只完成 review 记录后停住。如果用户刚刚已经确认了 L1 mini-plan、范围边界或正式产品边界，后续承接要写成“已确认，我按这个继续”这类确认已收到的语气，不要写成“确认，我们就按这个……”这种看起来像再次向用户索要确认的句子。如果当前 lane 已进入 silent-record 策略，就继续记录精确 review artifact 并推进，不要为了同一个需求再额外停顿。';
+  return 'Codex 回复规则: 只有当前真的还缺人来拍板时，才在 final answer 里停下来请求确认。只要用户已经明确说了“认可并继续”，或已经确认了 mini-plan、范围边界、正式产品边界，就直接沿着已确认路径继续，不要再写“如果你认可”“确认的话我就继续”这类二次索取确认的话。面向用户时，不要直接抛 lane、change、tasks、review artifact、work unit、digest、worker shard、write-scope、worktree、内部版本号、命令或文件路径这些内部词；统一改说“需求确认稿”“本次调整”“后续任务”“继续落地”“完成后检查”。如果后面真的还需要额外授权，再用人话把会做什么、不会做什么、完成后怎么检查说清楚。如果当前仍在 L2 的首轮澄清或需求摘要确认阶段，不要写成“你回我一句我就开始实现”；只能承诺“我先整理需求摘要给你确认，确认后再继续”。如果当前 lane 已进入 silent-record 策略，只能说明用户已经明确说了“不需要进行任何确认”；单纯的“请帮我实现/继续实现”不能把 lane 切到 silent-record。';
 }
 
 function confirmationGateMessage(gate) {
@@ -2078,34 +2231,40 @@ function confirmationGateMessage(gate) {
   return [
     intro,
     'Implementation may proceed only within the confirmed scope, with docs/basic, file manuals, folder README docs, standards verification, and OpenPrd run verification kept up to date. For backend, script, agent, tooling, service, or data-processing changes, keep CLI and API surface review current in docs/basic/backend-structure.md.',
-    'For UI or visual work with an existing reference image, capture the implemented UI and run openprd visual-compare . --reference <effect-image> --actual <implementation-screenshot>; inspect the generated JPG before claiming the visual work is complete. When there is no reference image, capture the before screenshot first, implement, capture the after screenshot from the same entry, viewport, account, and data state, then run openprd visual-compare . --before <before-screenshot> --after <after-screenshot> and inspect expected changes plus unintended drift.',
+    'For UI or visual work with an existing reference image, capture the implemented UI and run openprd visual-compare . --reference <effect-image> --actual <implementation-screenshot>; if local detail matters more than the whole screen, add openprd visual-compare . --board <focus-board.json> so the agent can review numbered zoom regions. When there is no reference image, capture the before screenshot first, implement, capture the after screenshot from the same entry, viewport, account, and data state, then run openprd visual-compare . --before <before-screenshot> --after <after-screenshot>; if the agent explored multiple optimization directions, add openprd visual-compare . --board <parallel-board.json> and inspect expected changes plus unintended drift before claiming completion.',
   ].join('\n');
 }
 
 function currentRequirementStatusLine(gate, progress) {
   if (gate?.status === 'review-confirmation-authorized') {
     return gate?.reviewActionAuthorization?.continueAfterReview
-      ? '用户刚刚确认了当前稳定 PRD 评审稿，并要求继续当前 OpenPrd 下一步；本回合先记录这一个版本的 review 状态，再按同一条 lane 往下推进。若 review 后 tasks 已就绪但还需要执行授权，立刻展示执行确认清单，不要再给一句泛泛确认。'
-      : '用户刚刚确认了当前稳定 PRD 评审稿；本回合只允许记录这一个版本的 review 状态，不能把它直接扩展成实现确认。';
+      ? '用户刚刚已经确认这版需求，并且明确表示继续。先记录这次确认结果，然后直接接着整理本次调整和后续任务；只有后面真的还缺额外授权时，再用人话说明影响和下一步。'
+      : '用户刚刚已经确认这版需求；本回合只允许记录这次确认结果，不能把它直接扩展成开工授权。';
   }
   if (gate?.status === 'review-recording-authorized') {
-    return '当前稳定 PRD 评审稿已经按 silent-record 策略授权记录；只允许写回这一个版本，随后继续 change 和 tasks。';
+    return '这版需求确认稿已经按免再次确认的规则授权记录；只记录这一次确认结果，然后继续整理本次调整和后续任务。';
   }
   switch (progress?.nextStep) {
+    case 'clarification-confirmation-required':
+      return '当前卡点: 先让用户确认当前需求摘要；在此之前不要把核心需求写成既定事实，也不要直接往后推进。';
+    case 'prd-synthesis-required':
+      return reviewPolicyAllowsSilentRecord(requirementApprovalPolicy(gate))
+        ? '当前卡点: 用户已明确表示不需要再停下来确认，可以直接整理已确认内容，并生成这版需求确认稿。'
+        : '当前卡点: 当前需求摘要已确认，下一步把已确认内容整理成这版需求确认稿。';
     case 'prd-review-required':
       return progress?.review?.versionId
-        ? '当前卡点: 先等用户确认当前稳定 PRD 评审稿；不要把“继续做”或“开落地吧”当成 review 确认。'
-        : '当前卡点: 先 synthesize 出本轮稳定 PRD 评审稿，再等待用户评审。';
+        ? '当前卡点: 先等用户确认这版需求确认稿；不要把“继续做”“开落地吧”或单纯的“请帮我实现/继续实现”当成已经认可这版内容。'
+        : '当前卡点: 先整理出这版需求确认稿，再等待用户确认。';
     case 'review-recording-required':
-      return '当前卡点: 稳定 PRD 评审稿已经生成；按当前 approval policy 可直接记录这版 review artifact，不需要再额外追问用户。';
+      return '当前卡点: 这版需求确认稿已经生成，而且用户已明确表示不需要再停下来确认；可以先记录这次确认结果，再继续后面的整理。';
     case 'change-generation-required':
-      return '当前卡点: PRD 评审已确认，下一步先生成 OpenPrd change。';
+      return '当前卡点: 这版需求已经确认，下一步先整理本次调整范围；这是当前流程的直接延续，不需要再重复索取同一轮确认。';
     case 'task-breakdown-required':
-      return '当前卡点: change 已存在，但还缺任务拆解，不能直接进入实现。';
+      return '当前卡点: 本次调整范围已经立起来了，下一步把它拆成可直接执行的后续任务。';
     case 'implementation-ready':
-      return '当前卡点: review 已确认且 tasks 已就绪；如果当前需求原本就明确要求实现，可直接进入实现；否则先展示执行确认清单，再请求用户确认执行。若用户刚刚确认的是 L1 范围边界或 mini-plan，承接话术要写成“已确认，我按这个继续”，不要再写成像二次索取确认的句子。';
+      return '当前卡点: 这版需求和后续任务都准备好了。如果用户一开始就明确要继续做，就直接进入实现；否则再用人话说明这次会做什么、不会做什么、完成后怎么检查。若用户刚刚确认的是 L1 范围边界或 mini-plan，承接话术要写成“已确认，我按这个继续”，不要再写成像二次索取确认的句子。';
     default:
-      return '当前卡点: 继续按“澄清 -> 评审 -> change -> tasks -> 实现”的顺序推进。';
+      return '当前卡点: 继续按“澄清需求 -> 确认需求 -> 整理本次调整 -> 拆分后续任务 -> 开始实现”的顺序推进。';
   }
 }
 
@@ -2118,28 +2277,29 @@ function currentRequirementMessage(intent, gate, progress) {
   const lines = [
     'OpenPrd 当前需求入口',
     gateStatus,
+    '对外表达要求: 面向用户不要直接复述 PRD、review artifact、change、tasks、lane、approval policy、work unit、digest、worker shard、write-scope、worktree、内部版本号、命令或文件路径；改说“需求确认稿”“本次调整”“后续任务”“继续落地”“完成后检查”。',
     '当前输入已被判定为可能的新功能/新流程方案（L2），因此进入重流程需求入口。不要按固定关键词判断；先用 $openprd-requirement-intake 按影响面、未知数、决策成本和验证成本判断用户可见需求类型。',
     '内部审查保留固定对照：快速修正=L0，现有功能优化=L1，新功能/新流程方案=L2。',
     '如果用户刚刚已经确认了现有功能优化（L1）的 mini-plan、范围边界或正式产品边界，下一句要明确写成“已确认，我按这个继续/收口/落地”；不要只写一个“确认”，更不要写成“确认，我们就按这个……”这种容易让用户误以为还要再表态的句子。',
-    '如果需求类型是新功能/新流程方案（L2），本轮只围绕这个新需求推进 PRD/review/change/tasks，并选择 base/consumer/b2b/agent PRD lens，不自动继续历史 active change。',
+    '如果需求类型是新功能/新流程方案（L2），本轮只围绕这个新需求推进 PRD/review/change/tasks，并选择通用场景 / 面向个人消费者场景 / 面向企业服务场景 / 以 Agent 为主要使用场景的 PRD 视角，不自动继续历史 active change。对用户复述时不要直接把 consumer / b2b / agent 当展示词；这些枚举值只用于内部记录和命令。',
     prompt ? '本轮需求: ' + prompt : '',
     gate?.intakeMode === 'deep-reflection'
       ? '需求入口: 先运行需求自省，再输出对话内澄清摘要或简短清单。'
       : '需求入口: 先做轻量项目映射，再确认影响点和验收方式。',
     reviewPolicyAllowsSilentRecord(approvalPolicy)
-      ? '当前 approval policy: decision-points / silent-record。保留稳定 review artifact，但在版本、digest、work unit 精确匹配时不再额外停下来追问用户。'
-      : '当前 approval policy: decision-points / human-review。稳定 review artifact 仍需要一次明确的人类决策。',
+      ? '当前 approval policy: decision-points / silent-record。之所以进入 silent-record，是因为用户已经明确表示不需要进行任何确认；单纯的“请帮我实现/继续实现”或“不要评审”都不够，仍然只能记录版本、digest、work unit 精确匹配的 artifact。'
+      : '当前 approval policy: decision-points / human-review。当前 lane 仍需要一次 requirement 摘要确认和一次稳定 review artifact 的明确人类决策；单纯的“请帮我实现/继续实现”不算这两次决策。',
     intent?.reviewContinuationRequested
       ? '这条消息同时表达了“确认当前稳定评审稿并继续当前 OpenPrd 下一步”的意图：先记录精确 review artifact，再继续当前 lane；如果 review 后 tasks 已就绪但还需要执行授权，立刻展示执行确认清单，不要停在“如果你要我继续”。'
       : '',
     currentRequirementStatusLine(gate, progress),
     reviewPolicyAllowsSilentRecord(approvalPolicy)
-      ? 'Decision-point order: clarify the requirement, capture user answers, synthesize the PRD, record the exact stable review artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.'
-      : 'Decision-point order: clarify the requirement, capture user answers, synthesize the PRD, wait for a human review decision on the stable artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.',
+      ? 'Decision-point order: because the user explicitly waived any confirmation stop, you may skip requirement-summary confirmation, write back requirement facts, synthesize the PRD, record the exact stable review artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.'
+      : 'Decision-point order: clarify the requirement, summarize it in chat using 需求判断 / 需求理解 / 功能范围 / 技术方案, prefer Markdown tables for 功能范围 and 技术方案, wait for the user to confirm that requirement summary, write back only confirmed facts, synthesize the PRD, wait for a human review decision on the stable artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.',
     intent?.largeUiChangeRequest
       ? 'Large UI direction gate: before PRD freeze or implementation, capture the current in-product screen with Codex Computer Use, generate at least three Image 2 directions, combine them into one horizontal numbered contact sheet, and wait for the user to choose a direction.'
       : '',
-    'Recommended next action: 先在 chat 输出“需求类型判断”，同时写清“需求类型”和“内部路由码”；若为新功能/新流程方案（L2），再运行 openprd clarify .，并在十句话左右回答 target、scope、out-of-scope、acceptance 后请求确认。Do not open clarification HTML; use review.html only after synthesize/review.',
+    'Recommended next action: 先在 chat 输出“需求类型判断”，默认把路由码并进“需求类型：新功能/新流程方案（L2）”这类标签里；只有内部排障确实需要时，才额外写“内部路由码”。若为新功能/新流程方案（L2），再运行 openprd clarify .，并按“需求判断 / 需求理解 / 功能范围 / 技术方案”给出十句话左右的结构化摘要，其中“功能范围”和“技术方案”优先用 Markdown 表格；请求确认后再写回 requirement 事实并继续 classify/synthesize，不要把这一步表述成“确认后直接开始实现”。Do not open clarification HTML; use review.html only after synthesize/review.',
   ];
   if (isImplementationAdvanceIntent(intent)) {
     lines.splice(2, 1, gate?.active
@@ -2151,7 +2311,7 @@ function currentRequirementMessage(intent, gate, progress) {
 }
 
 function requirementRoutingSummary() {
-  return '需求类型由 $openprd-requirement-intake 按影响面、未知数、决策成本和验证成本判断：快速修正(L0)直接处理并事后说明，不打开正式 PRD/review/change/tasks；现有功能优化(L1)先给对话内 mini-plan，默认不生成正式 PRD/change/tasks；新功能/新流程方案(L2)才进入 requirement intake 与 PRD/review/change/tasks，并选择 base/consumer/b2b/agent PRD lens。只有在用户原始意图已明确要求实现，或后续明确发出执行指令时，才进入实现。';
+  return '需求类型由 $openprd-requirement-intake 按影响面、未知数、决策成本和验证成本判断：快速修正(L0)直接处理并事后说明，不打开正式 PRD/review/change/tasks；现有功能优化(L1)先给对话内 mini-plan，默认不生成正式 PRD/change/tasks；新功能/新流程方案(L2)才进入 requirement intake 与 PRD/review/change/tasks，并选择通用场景 / 面向个人消费者场景 / 面向企业服务场景 / 以 Agent 为主要使用场景的 PRD 视角。对用户复述时不要直接把 consumer / b2b / agent 当展示词；这些枚举值只用于内部记录和命令。单纯的“请帮我实现/继续实现”只表示有执行意图，不表示跳过 requirement 摘要确认或 review；只有用户明确表示不需要进行任何确认时，才允许静默走完整 requirement write path。';
 }
 
 function historicalRequirementReminder(root, runContext, intent, gate) {
@@ -2178,6 +2338,11 @@ function historicalRequirementReminder(root, runContext, intent, gate) {
   ].filter(Boolean).join('\n');
 }
 
+function knowledgeSkillReminder(runContext) {
+  const lines = knowledgeSkillContextLines(runContext?.knowledgeSkills);
+  return lines.length > 0 ? lines.join('\n') : null;
+}
+
 function contextMessage(cwd, intent = null, gate = null, progress = null) {
   const run = progress?.runContext
     ? { ok: true, parsed: progress.runContext, stdout: renderRunContextText(progress.runContext) }
@@ -2190,6 +2355,7 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
       return [
         currentRequirementMessage(intent, gate, effectiveProgress),
         historicalRequirementReminder(cwd, run.parsed, intent, gate),
+        knowledgeSkillReminder(run.parsed),
         'OpenPrd 上下文只是建议，不是自动执行指令。请先判断用户当前意图。',
         lightweightRequirementMessage(intent),
         visualMockupMessage(intent),
@@ -2198,8 +2364,8 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
         '如果用户只是要求看看、规划、分析、审查、解释影响或列出文件，请保持只读并基于证据回答；不要运行 OpenPrd loop、任务推进、discovery 推进、commit 或其他写入命令。',
         '只有当用户当前明确要求开发、实现、修复、继续任务、深度调研、对标复刻或提交时，才运行 openprd loop --run、openprd tasks --advance、openprd discovery --advance、commit/push 等执行命令。',
         '代码修改完成后、最终回复前，针对本轮实际 touched code files 运行 openprd dev-check . <file...>；若出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，列出影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试。',
-        '大界面改动进入实现前，先用 Codex Computer Use 截取产品内当前功能截图，再用 Codex 原生 Image 2 基于截图生成至少 3 个设计方向，横向拼接为一张带 1/2/3 序号的大图给用户确认；未确认方向前不要进入大 UI 实现。',
-        '涉及界面、页面、视觉、样式或前端体验，且已经有效果图/设计稿/用户给图并进入实现阶段时，阶段性完成后必须截图并运行 openprd visual-compare . --reference <效果图> --actual <实现截图>；没有明确参考图但改动界面时，动手前先截修改前截图，完成后用同一入口、视口、账号和数据状态截修改后截图，并运行 openprd visual-compare . --before <修改前截图> --after <修改后截图>；默认输出 JPG 到 .openprd/harness/visual-reviews/。查看合成图后继续对标或自检，直到没有明显视觉差异或意外漂移。',
+        '大界面改动进入实现前，先用 Codex Computer Use 截取产品内当前功能截图，再用 `imagegen`（Codex 原生 Image 2）基于截图生成至少 3 个设计方向，横向拼接为一张带 1/2/3 序号的大图给用户确认；未确认方向前不要进入大 UI 实现。',
+        '涉及界面、页面、视觉、样式或前端体验，且已经有效果图/设计稿/用户给图并进入实现阶段时，阶段性完成后必须截图并运行 openprd visual-compare . --reference <效果图> --actual <实现截图>；如果这次重点在局部细节，再补一份 openprd visual-compare . --board <focus-board.json>。没有明确参考图但改动界面时，动手前先截修改前截图，完成后用同一入口、视口、账号和数据状态截修改后截图，并运行 openprd visual-compare . --before <修改前截图> --after <修改后截图>；如果并行试了多个优化方向，再补一份 openprd visual-compare . --board <parallel-board.json>；默认输出 JPG 到 .openprd/harness/visual-reviews/。查看合成图后继续对标或自检，直到没有明显视觉差异或意外漂移。',
         '发现可沉淀项时不要中途打断任务：代码扩展识别这类白名单工具补全会自动应用并记录；用户偏好、项目协作规矩和 OpenPrd 默认行为先记录为候选，收工时运行 openprd grow . --review 集中确认。',
         '维护 OpenPrd 本身且涉及配置类能力时，先判断是否应纳入 openprd grow；高置信可成长默认纳入，不确定则主动询问用户。',
         '涉及后端、脚本、Agent、工具链、服务或数据处理变更时，把 CLI 与 API 视为同级接入面：同步检查命令入口、参数、输出契约、help/doctor/dry-run/status 与接口协议、返回结构、身份边界是否受影响，并更新 docs/basic/backend-structure.md 或明确写不适用原因。',
@@ -2209,6 +2375,7 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
     return [
       run.stdout,
       gateMessage,
+      knowledgeSkillReminder(run.parsed),
       'OpenPrd 上下文只是建议，不是自动执行指令。请先判断用户当前意图。',
       lightweightRequirementMessage(intent),
       visualMockupMessage(intent),
@@ -2217,8 +2384,8 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
       '如果用户只是要求看看、规划、分析、审查、解释影响或列出文件，请保持只读并基于证据回答；不要运行 OpenPrd loop、任务推进、discovery 推进、commit 或其他写入命令。',
       '只有当用户当前明确要求开发、实现、修复、继续任务、深度调研、对标复刻或提交时，才运行 openprd loop --run、openprd tasks --advance、openprd discovery --advance、commit/push 等执行命令。',
       '代码修改完成后、最终回复前，针对本轮实际 touched code files 运行 openprd dev-check . <file...>；若出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，列出影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试。',
-      '大界面改动进入实现前，先用 Codex Computer Use 截取产品内当前功能截图，再用 Codex 原生 Image 2 基于截图生成至少 3 个设计方向，横向拼接为一张带 1/2/3 序号的大图给用户确认；未确认方向前不要进入大 UI 实现。',
-      '涉及界面、页面、视觉、样式或前端体验，且已经有效果图/设计稿/用户给图并进入实现阶段时，阶段性完成后必须截图并运行 openprd visual-compare . --reference <效果图> --actual <实现截图>；没有明确参考图但改动界面时，动手前先截修改前截图，完成后用同一入口、视口、账号和数据状态截修改后截图，并运行 openprd visual-compare . --before <修改前截图> --after <修改后截图>；默认输出 JPG 到 .openprd/harness/visual-reviews/。查看合成图后继续对标或自检，直到没有明显视觉差异或意外漂移。',
+      '大界面改动进入实现前，先用 Codex Computer Use 截取产品内当前功能截图，再用 `imagegen`（Codex 原生 Image 2）基于截图生成至少 3 个设计方向，横向拼接为一张带 1/2/3 序号的大图给用户确认；未确认方向前不要进入大 UI 实现。',
+      '涉及界面、页面、视觉、样式或前端体验，且已经有效果图/设计稿/用户给图并进入实现阶段时，阶段性完成后必须截图并运行 openprd visual-compare . --reference <效果图> --actual <实现截图>；如果这次重点在局部细节，再补一份 openprd visual-compare . --board <focus-board.json>。没有明确参考图但改动界面时，动手前先截修改前截图，完成后用同一入口、视口、账号和数据状态截修改后截图，并运行 openprd visual-compare . --before <修改前截图> --after <修改后截图>；如果并行试了多个优化方向，再补一份 openprd visual-compare . --board <parallel-board.json>；默认输出 JPG 到 .openprd/harness/visual-reviews/。查看合成图后继续对标或自检，直到没有明显视觉差异或意外漂移。',
       '发现可沉淀项时不要中途打断任务：代码扩展识别这类白名单工具补全会自动应用并记录；用户偏好、项目协作规矩和 OpenPrd 默认行为先记录为候选，收工时运行 openprd grow . --review 集中确认。',
       '维护 OpenPrd 本身且涉及配置类能力时，先判断是否应纳入 openprd grow；高置信可成长默认纳入，不确定则主动询问用户。',
       '涉及后端、脚本、Agent、工具链、服务或数据处理变更时，把 CLI 与 API 视为同级接入面：同步检查命令入口、参数、输出契约、help/doctor/dry-run/status 与接口协议、返回结构、身份边界是否受影响，并更新 docs/basic/backend-structure.md 或明确写不适用原因。',
@@ -2254,8 +2421,13 @@ function shouldInjectOpenPrdContext(payload) {
     return false;
   }
   const intent = analyzePromptIntent(prompt);
+  const hasProjectPathReference = /(?:^|[\s`"'(])(?:src|app|lib|server|scripts|test|tests|docs|skills|openprd|openspec)\/[^\s`"'()]+/i.test(prompt);
   if (
     intent.simpleConcrete
+    && !intent.visualMockupRequest
+    && !intent.largeUiChangeRequest
+    && !intent.continuationRequest
+    && !hasProjectPathReference
     && !intent.productCopyRequest
     && !intent.secretsRequest
     && !intent.weappValidationRequest
@@ -2505,6 +2677,18 @@ function handle(eventName, cwd, payload) {
       progress = null;
     }
     if (isBlockingRequirementGate(gate)) {
+      if ((intent.confirmation || shortAffirmative) && progress?.nextStep === 'clarification-confirmation-required') {
+        gate = holdRequirementGate(root, prompt, progress, sessionId, {
+          status: 'clarification-confirmed',
+          clarificationConfirmedAt: now(),
+          clarificationConfirmationPreview: preview(prompt, 500),
+        });
+        progress = evaluateRequirementGateProgress(root, sessionId);
+        appendEvent(root, { ...baseEvent, outcome: 'requirement-gate-clarification-confirmed' });
+        recordRunHook(root, baseEvent, 'requirement-gate-clarification-confirmed');
+        updateHookState(root, baseEvent);
+        return allowHook(composeHookContext(root, intent, gate, progress, sessionId));
+      }
       if (intent.reviewDecision) {
         const authorization = reviewActionAuthorizationFor(intent, progress, prompt);
         gate = holdRequirementGate(root, prompt, progress, sessionId, {
@@ -2602,6 +2786,7 @@ function handle(eventName, cwd, payload) {
       const reviewMark = parseReviewMarkCommand(commandText(payload));
       const approvalPolicy = requirementApprovalPolicy(gate);
       const silentRecord = reviewPolicyAllowsSilentRecord(approvalPolicy);
+      const writePathMutation = isRequirementWritePathMutation(commandText(payload));
       const reason = reviewMark
         ? [
             silentRecord
@@ -2615,19 +2800,23 @@ function handle(eventName, cwd, payload) {
               : 'Current review artifact has not been synthesized yet. Run openprd synthesize . --open first.',
             silentRecord
               ? 'Do not mark any stale or different review artifact; only the exact current artifact is allowed.'
-              : 'Implementation approval and review confirmation are different gates; do not treat "可以开做" or similar wording as permission to run openprd review --mark confirmed.',
+              : 'Implementation approval and review confirmation are different gates; do not treat "可以开做", plain "请帮我实现/继续实现", or similar wording as permission to run openprd review --mark confirmed.',
           ].filter(Boolean).join('\n')
         : [
             'OpenPrd blocked a mutating action because the requirement gate is still active.',
             progress?.reason || 'The requirement still needs PRD review, change generation, or task preparation.',
             progress?.nextStep === 'implementation-ready'
               ? 'Do not edit implementation files until the user clearly asks to execute this reviewed requirement.'
+              : writePathMutation && progress?.nextStep === 'clarification-confirmation-required'
+                ? 'Do not write requirement facts, classify, or synthesize yet. First summarize the requirement in chat using 需求判断 / 需求理解 / 功能范围 / 技术方案, prefer Markdown tables for 功能范围 and 技术方案, wait for the user to confirm that summary, then continue the requirement write path.'
+                : writePathMutation && progress?.nextStep === 'prd-synthesis-required'
+                  ? 'You may continue the requirement write path only within the confirmed summary: write back confirmed facts, classify if needed, synthesize the PRD, then proceed to review/change/tasks.'
               : progress?.nextStep === 'review-recording-required'
                 ? 'Do not edit implementation files yet. First record the exact current stable review artifact, then generate change and tasks.'
                 : 'Do not edit implementation files until the active approval policy is satisfied and the OpenPrd change has generated tasks.',
             silentRecord
-              ? 'Decision-point order: clarify the requirement, capture user answers, synthesize the PRD, record the exact stable review artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.'
-              : 'Decision-point order: clarify the requirement, capture user answers, synthesize the PRD, wait for a human review decision on the stable artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.',
+              ? 'Decision-point order: because the user explicitly waived any confirmation stop, you may skip requirement-summary confirmation, write back requirement facts, synthesize the PRD, record the exact stable review artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.'
+              : 'Decision-point order: clarify the requirement, summarize it in chat using 需求判断 / 需求理解 / 功能范围 / 技术方案, prefer Markdown tables for 功能范围 and 技术方案, wait for the user to confirm that requirement summary, write back only confirmed facts, synthesize the PRD, wait for a human review decision on the stable artifact, generate the OpenPrd change, prepare the task breakdown, then implement within the confirmed scope.',
           ].join('\n');
       appendEvent(root, { ...baseEvent, outcome: 'blocked-requirement-intake' });
       recordRunHook(root, baseEvent, 'blocked-requirement-intake');
@@ -2656,7 +2845,7 @@ function handle(eventName, cwd, payload) {
       recordRunHook(root, baseEvent, 'allowed-medium-risk');
       updateHookState(root, baseEvent);
       recordTouchedFiles(root, payload);
-      return allowHook('OpenPrd 检测到写入动作。本轮写入完成后、最终回复前，请针对实际 touched code files 运行 openprd dev-check . <file...>；如出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，说明影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试；如涉及界面视觉且已有参考效果图并进入实现阶段，阶段性完成后运行 openprd visual-compare . --reference <效果图> --actual <实现截图> 并查看 JPG 对比图；如无参考图但改动界面，确认已先截修改前截图，并在完成后运行 openprd visual-compare . --before <修改前截图> --after <修改后截图> 查看 JPG 自检图；发现可沉淀项时不要中途打断任务，代码扩展识别这类白名单工具补全会自动应用并记录，用户偏好、项目协作规矩和 OpenPrd 默认行为留到收工时用 openprd grow . --review 集中确认；维护 OpenPrd 本身且涉及配置类能力时，先判断是否应纳入 openprd grow；声明就绪前，请同步维护 docs/basic、文件说明书、文件夹 README，以及相关 OpenPrd change/task 状态；如果涉及后端、脚本、Agent、工具链、服务或数据处理变更，还要把 CLI 与 API 视为同级接入面并更新 docs/basic/backend-structure.md。');
+      return allowHook('OpenPrd 检测到写入动作。本轮写入完成后、最终回复前，请针对实际 touched code files 运行 openprd dev-check . <file...>；如出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，说明影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试；如涉及界面视觉且已有参考效果图并进入实现阶段，阶段性完成后运行 openprd visual-compare . --reference <效果图> --actual <实现截图> 并查看 JPG 对比图；若局部细节更重要，再补 openprd visual-compare . --board <focus-board.json>；如无参考图但改动界面，确认已先截修改前截图，并在完成后运行 openprd visual-compare . --before <修改前截图> --after <修改后截图> 查看 JPG 自检图；若并行试了多个优化方向，再补 openprd visual-compare . --board <parallel-board.json>；发现可沉淀项时不要中途打断任务，代码扩展识别这类白名单工具补全会自动应用并记录，用户偏好、项目协作规矩和 OpenPrd 默认行为留到收工时用 openprd grow . --review 集中确认；维护 OpenPrd 本身且涉及配置类能力时，先判断是否应纳入 openprd grow；声明就绪前，请同步维护 docs/basic、文件说明书、文件夹 README，以及相关 OpenPrd change/task 状态；如果涉及后端、脚本、Agent、工具链、服务或数据处理变更，还要把 CLI 与 API 视为同级接入面并更新 docs/basic/backend-structure.md。');
     }
     return allowHook();
   }
@@ -2691,6 +2880,12 @@ function handle(eventName, cwd, payload) {
         'OpenPrd 在本轮收工回顾里发现小程序运行态验证仍未完成。',
         '如果这次任务是用户明确要求的小程序实测、复现、截图、抓日志/网络，或你已经承诺提供运行态证据，请补齐本地运行态验证；补齐时默认沿用当前小程序运行态或开发者工具会话连续验证，不要为了验证自动重开应用；否则不要把普通代码改动默认升级成小程序实测。',
         '如果当前环境没有可用的小程序本地验证工具，请明确说明未完成运行态验证，不要假定工具已安装。',
+      ].join('\n'));
+    }
+    if (stopIntent.visualMockupRequest && (!Array.isArray(turnState.touchedFiles) || turnState.touchedFiles.length === 0)) {
+      return allowHook([
+        'OpenPrd 生图事实对齐提醒：如果这轮要汇报图片结果、失败或限流，请确保它来自一次实际的 `imagegen` 调用。',
+        '未实际调用 `imagegen` 前，不要声称“生图限流”“生图失败”或“已经生成图片结果”；若本轮还没调用，请如实说明仍未开始或尚未完成生图。',
       ].join('\n'));
     }
     const devCheckMessage = devCheckWrapUpMessage(root, turnState);
