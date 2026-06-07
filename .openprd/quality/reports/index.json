@@ -1,7 +1,21 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-07 12:43:49",
+  "updatedAt": "2026-06-07 12:50:41",
   "reports": [
+    {
+      "reportId": "eval-20260607125040",
+      "jsonPath": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/quality/reports/eval-20260607125040.json",
+      "htmlPath": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/quality/reports/eval-20260607125040.html",
+      "generatedAt": "2026-06-07 12:50:41",
+      "status": "production-ready"
+    },
+    {
+      "reportId": "eval-20260607125036",
+      "jsonPath": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/quality/reports/eval-20260607125036.json",
+      "htmlPath": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/quality/reports/eval-20260607125036.html",
+      "generatedAt": "2026-06-07 12:50:37",
+      "status": "production-ready"
+    },
     {
       "reportId": "eval-20260607124349",
       "jsonPath": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/quality/reports/eval-20260607124349.json",
@@ -686,20 +700,6 @@
       "jsonPath": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/quality/reports/eval-20260529095721.json",
       "htmlPath": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/quality/reports/eval-20260529095721.html",
       "generatedAt": "2026-05-29 09:57:22",
-      "status": "production-ready"
-    },
-    {
-      "reportId": "eval-20260529024628",
-      "jsonPath": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/quality/reports/eval-20260529024628.json",
-      "htmlPath": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/quality/reports/eval-20260529024628.html",
-      "generatedAt": "2026-05-29 02:46:29",
-      "status": "production-ready"
-    },
-    {
-      "reportId": "eval-20260529024249",
-      "jsonPath": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/quality/reports/eval-20260529024249.json",
-      "htmlPath": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/quality/reports/eval-20260529024249.html",
-      "generatedAt": "2026-05-29 02:42:49",
       "status": "production-ready"
     }
   ]

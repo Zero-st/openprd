@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-07 12:49:34",
+  "updatedAt": "2026-06-07 12:50:41",
   "incidents": [
     {
       "incidentId": "incident-candidate-turn-1780116203372-5f266a79e968c758",
@@ -119,15 +119,43 @@
       "description": "由 OpenPrd 从 diagnostic-bundle 自动沉淀的项目级排查经验。目标是在相似问题再次出现时优先复用现有诊断证据，而不是临时补日志。",
       "summary": "本轮围绕 8 个可沉淀文件生成回顾。 本轮结果里已经出现可复用的症状、排查线索或根因模式，不应该只留在当前对话里。 已记录 2 条回顾信号。",
       "adoption": {
-        "hitCount": 6,
-        "referencedCount": 6,
+        "hitCount": 7,
+        "referencedCount": 7,
         "injectedCount": 0,
-        "lastHitAt": "2026-06-07 12:43:49",
-        "lastReferencedAt": "2026-06-07 12:43:49",
+        "lastHitAt": "2026-06-07 12:50:40",
+        "lastReferencedAt": "2026-06-07 12:50:40",
         "lastInjectedAt": null,
         "lastSource": "run-context",
         "recentEvents": [
           {
+            "at": "2026-06-07 12:50:40",
+            "stage": "referenced",
+            "source": "run-context",
+            "sessionId": null,
+            "promptPreview": null,
+            "matchSummary": "命中 openprd-experience-diagnostic-candidate-turn-1780116203372-5f266a79e968c758 / 由 OpenPrd 从 diagnostic-bundle 自动沉淀的项目级排查经验。目标是在相似问题再次出现时优先复用现有诊断证据，而不是临时补日志。 / Inspect skills/openprd-requirement-intake/SKILL.md",
+            "matchedOn": [
+              "openprd-experience-diagnostic-candidate-turn-1780116203372-5f266a79e968c758",
+              "由 OpenPrd 从 diagnostic-bundle 自动沉淀的项目级排查经验。目标是在相似问题再次出现时优先复用现有诊断证据，而不是临时补日志。",
+              "Inspect skills/openprd-requirement-intake/SKILL.md",
+              "Inspect skills/openprd-harness/SKILL.md"
+            ]
+          },
+          {
+            "at": "2026-06-07 12:50:40",
+            "stage": "hit",
+            "source": "run-context",
+            "sessionId": null,
+            "promptPreview": null,
+            "matchSummary": "命中 openprd-experience-diagnostic-candidate-turn-1780116203372-5f266a79e968c758 / 由 OpenPrd 从 diagnostic-bundle 自动沉淀的项目级排查经验。目标是在相似问题再次出现时优先复用现有诊断证据，而不是临时补日志。 / Inspect skills/openprd-requirement-intake/SKILL.md",
+            "matchedOn": [
+              "openprd-experience-diagnostic-candidate-turn-1780116203372-5f266a79e968c758",
+              "由 OpenPrd 从 diagnostic-bundle 自动沉淀的项目级排查经验。目标是在相似问题再次出现时优先复用现有诊断证据，而不是临时补日志。",
+              "Inspect skills/openprd-requirement-intake/SKILL.md",
+              "Inspect skills/openprd-harness/SKILL.md"
+            ]
+          },
+          {
             "at": "2026-06-07 12:43:49",
             "stage": "referenced",
             "source": "run-context",
@@ -255,34 +283,6 @@
           },
           {
             "at": "2026-06-06 23:03:21",
-            "stage": "hit",
-            "source": "run-context",
-            "sessionId": null,
-            "promptPreview": null,
-            "matchSummary": "命中 openprd-experience-diagnostic-candidate-turn-1780116203372-5f266a79e968c758 / 由 OpenPrd 从 diagnostic-bundle 自动沉淀的项目级排查经验。目标是在相似问题再次出现时优先复用现有诊断证据，而不是临时补日志。 / Inspect skills/openprd-requirement-intake/SKILL.md",
-            "matchedOn": [
-              "openprd-experience-diagnostic-candidate-turn-1780116203372-5f266a79e968c758",
-              "由 OpenPrd 从 diagnostic-bundle 自动沉淀的项目级排查经验。目标是在相似问题再次出现时优先复用现有诊断证据，而不是临时补日志。",
-              "Inspect skills/openprd-requirement-intake/SKILL.md",
-              "Inspect skills/openprd-harness/SKILL.md"
-            ]
-          },
-          {
-            "at": "2026-06-06 22:43:23",
-            "stage": "referenced",
-            "source": "run-context",
-            "sessionId": null,
-            "promptPreview": null,
-            "matchSummary": "命中 openprd-experience-diagnostic-candidate-turn-1780116203372-5f266a79e968c758 / 由 OpenPrd 从 diagnostic-bundle 自动沉淀的项目级排查经验。目标是在相似问题再次出现时优先复用现有诊断证据，而不是临时补日志。 / Inspect skills/openprd-requirement-intake/SKILL.md",
-            "matchedOn": [
-              "openprd-experience-diagnostic-candidate-turn-1780116203372-5f266a79e968c758",
-              "由 OpenPrd 从 diagnostic-bundle 自动沉淀的项目级排查经验。目标是在相似问题再次出现时优先复用现有诊断证据，而不是临时补日志。",
-              "Inspect skills/openprd-requirement-intake/SKILL.md",
-              "Inspect skills/openprd-harness/SKILL.md"
-            ]
-          },
-          {
-            "at": "2026-06-06 22:43:23",
             "stage": "hit",
             "source": "run-context",
             "sessionId": null,
