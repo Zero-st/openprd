@@ -2,7 +2,7 @@
   "version": 1,
   "enabled": true,
   "strategy": "semver",
-  "currentVersion": "0.1.9",
+  "currentVersion": "0.1.10",
   "versions": [
     {
       "version": "0.1.2",
@@ -340,9 +340,9 @@
     },
     {
       "version": "0.1.9",
-      "status": "current",
+      "status": "released",
       "createdAt": "2026-06-06 15:46:43",
-      "updatedAt": "2026-06-06 15:46:44",
+      "updatedAt": "2026-06-07 12:54:33",
       "notes": null,
       "items": [
         {
@@ -380,8 +380,29 @@
         }
       ],
       "tag": null
+    },
+    {
+      "version": "0.1.10",
+      "status": "current",
+      "createdAt": "2026-06-07 12:54:33",
+      "updatedAt": "2026-06-07 12:54:33",
+      "notes": null,
+      "items": [
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "改进 OpenPrD 执行闭环，让学习材料、视觉评审、质量收口按场景判断，并补齐发布所需的版本事实",
+          "sentence": "优化：改进 OpenPrD 执行闭环，让学习材料、视觉评审、质量收口按场景判断，并补齐发布所需的版本事实",
+          "recordedAt": "2026-06-07 12:54:33",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1780808073352"
+          }
+        }
+      ],
+      "tag": null
     }
   ],
   "createdAt": "2026-06-02 21:28:04",
-  "updatedAt": "2026-06-06 15:46:44"
+  "updatedAt": "2026-06-07 12:54:33"
 }
