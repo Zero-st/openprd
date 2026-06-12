@@ -442,3 +442,86 @@
 {"type":"next","at":"2026-06-07 12:51:58","nextAction":"diagram","reason":"A architecture diagram has not been generated yet and should be reviewed before freeze.","missingRequiredFields":0}
 {"type":"work_units_backfilled","at":"2026-06-07 12:52:32","versions":5,"changedVersions":5}
 {"type":"next","at":"2026-06-07 12:54:50","nextAction":"diagram","reason":"A architecture diagram has not been generated yet and should be reviewed before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 12:56:01","nextAction":"diagram","reason":"A architecture diagram has not been generated yet and should be reviewed before freeze.","missingRequiredFields":0}
+{"type":"clarify","at":"2026-06-07 13:00:51","missingRequiredFields":0,"mustAskUser":[],"scenario":"continuing-workspace","intakeReflection":null,"presentationMode":"inline"}
+{"type":"next","at":"2026-06-07 13:02:19","nextAction":"diagram","reason":"A architecture diagram has not been generated yet and should be reviewed before freeze.","missingRequiredFields":0}
+{"type":"capture","at":"2026-06-07 13:06:02","fields":["meta.productType","meta.title","meta.owner","problem.problemStatement","problem.whyNow","problem.evidence","users.primaryUsers","users.stakeholders","goals.goals","goals.successMetrics","goals.acceptanceGoals","scope.inScope","scope.outOfScope","scenarios.primaryFlows","scenarios.edgeCases","scenarios.failureModes","requirements.functional","requirements.nonFunctional","requirements.businessRules","constraints.technical","constraints.dependencies","constraints.compliance","risks.assumptions","risks.risks","risks.openQuestions","typeSpecific.fields.humanAgentContract","typeSpecific.fields.autonomyBoundary","typeSpecific.fields.toolBoundary","typeSpecific.fields.stateModel","typeSpecific.fields.evalPlan","handoff.owner","handoff.nextStep","handoff.targetSystem","businessGuardrails.costDrivers","businessGuardrails.usageLimits","businessGuardrails.abusePrevention","businessGuardrails.monitoringSignals","businessGuardrails.alertThresholds","businessGuardrails.stopLossActions"],"sources":["user-confirmed","user-confirmed","agent-normalized","user-confirmed","user-confirmed","project-derived","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","project-derived","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","user-confirmed","agent-normalized","agent-normalized","agent-normalized","agent-inferred","user-confirmed","user-confirmed","agent-inferred","agent-inferred","user-confirmed"],"staleReview":true}
+{"type":"next","at":"2026-06-07 13:06:09","nextAction":"clarify-user","reason":"工作区缺少用户确认的关键信息，需要先澄清再继续合成。","missingRequiredFields":0}
+{"type":"capture","at":"2026-06-07 13:06:56","fields":["businessGuardrails.costDrivers","businessGuardrails.monitoringSignals","businessGuardrails.alertThresholds"],"sources":["user-confirmed","user-confirmed","user-confirmed"],"staleReview":false}
+{"type":"next","at":"2026-06-07 13:07:01","nextAction":"diagram","reason":"A architecture diagram has not been generated yet and should be reviewed before freeze.","missingRequiredFields":0}
+{"type":"synthesized","at":"2026-06-07 13:07:07","versionId":"v0006","versionNumber":6,"productType":"agent","reviewArtifact":null,"reviewPresentationRequired":true}
+{"type":"diagram_generated","at":"2026-06-07 13:08:25","versionId":"v0006","productType":"agent","diagramType":"architecture","inputPath":null,"htmlPath":"/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/engagements/active/architecture-diagram.html","mermaidPath":"/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/engagements/active/architecture-diagram.mmd"}
+{"type":"review_marked","at":"2026-06-07 13:10:43","versionId":"v0006","workUnitId":"wu-20260607130707-4f012e44","status":"confirmed"}
+{"type":"next","at":"2026-06-07 13:10:50","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"openprd_change_generated","at":"2026-06-07 13:11:18","changeId":"loop-isolated-worktree-commit","taskCount":21,"valid":true}
+{"type":"next","at":"2026-06-07 13:22:45","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 13:22:45","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 13:33:21","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 13:35:36","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 13:38:33","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 13:52:16","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 13:56:25","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 13:59:21","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 14:05:27","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"review_marked","at":"2026-06-07 14:15:01","versionId":"v0006","workUnitId":"wu-20260607130707-4f012e44","status":"confirmed"}
+{"type":"next","at":"2026-06-07 14:16:47","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 14:25:44","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 14:33:16","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 14:39:52","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 14:42:39","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 14:43:37","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 14:45:18","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 14:56:51","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 14:57:35","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 14:57:49","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-07 15:15:21","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"work_units_backfilled","at":"2026-06-07 18:32:04","versions":6,"changedVersions":6}
+{"type":"next","at":"2026-06-07 23:47:03","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 00:42:38","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"work_units_backfilled","at":"2026-06-08 10:07:26","versions":6,"changedVersions":6}
+{"type":"next","at":"2026-06-08 12:08:53","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 12:29:03","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 16:03:26","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 18:15:14","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 18:58:47","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 19:34:39","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 20:20:57","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 21:14:03","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 21:20:15","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 21:20:30","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 21:52:45","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 22:27:49","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 22:27:53","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 23:19:16","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 23:19:16","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 23:19:16","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-08 23:27:46","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 00:06:02","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 00:06:08","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 00:06:15","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 00:09:41","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 01:18:38","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 01:40:34","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 08:47:31","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 09:16:09","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 09:47:34","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 10:36:15","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 11:11:56","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 11:17:31","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 11:54:38","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 11:56:50","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 12:44:32","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 13:08:47","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 13:15:23","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 14:14:48","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 15:47:05","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-09 15:59:37","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-12 11:06:35","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-12 11:23:18","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-12 12:39:12","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-12 12:50:38","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-12 13:13:03","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-12 13:37:22","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-12 13:43:59","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-12 18:37:29","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}
+{"type":"next","at":"2026-06-12 18:43:49","nextAction":"diagram","reason":"The architecture diagram exists but is still pending confirmation before freeze.","missingRequiredFields":0}

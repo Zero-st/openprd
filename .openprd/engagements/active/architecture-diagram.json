@@ -1,0 +1,176 @@
+{
+  "type": "architecture",
+  "version": 1,
+  "generatedAt": "2026-06-07 13:08:25",
+  "locale": "zh-CN",
+  "title": "架构评审",
+  "subtitle": "在需求定稿前评审系统边界、依赖和交接形态。",
+  "components": [
+    {
+      "id": "users",
+      "name": "主要用户",
+      "type": "external",
+      "subtitle": "需要用 OpenPrd loop 执行中等到长程实现的维护者 · 希望逐任务 commit、可审查、可回归且不污染主工作区的 Agent 协作者",
+      "details": [
+        "OpenPrd 维护者",
+        "在脏仓库或长程任务中依赖 loop 的项目协作者"
+      ]
+    },
+    {
+      "id": "experience",
+      "name": "Agent 使用场景层",
+      "type": "frontend",
+      "subtitle": "用户为一个 change 进入 loop 开发时，OpenPrd 可显式创建或接入隔离 worktree 与命名分支，再在其中逐任务运行和提交。 · 每个任务验证通过后执行 finish -…",
+      "details": [
+        "给 openprd loop --run 增加显式 --worktree / --branch，或提供先创建隔离 worktree 再执行的包装入口。",
+        "在 commit 前增加主工作区脏状态门禁和显式 override 机制。",
+        "把提交范围从 git add -A 收窄到 task write-scope 或本轮 touched files。"
+      ]
+    },
+    {
+      "id": "core",
+      "name": "核心产品逻辑",
+      "type": "backend",
+      "subtitle": "OpenPrd 的 loop 虽然支持逐任务 finish 和可选 commit，但最近没有稳定形成“隔离 worktree + 单任务 commit + 可审查回归”的闭环。当前 loop…",
+      "details": [
+        "支持显式 worktree / branch 配置，或提供隔离运行包装命令。",
+        "支持检测主工作区脏状态，并在 finish --commit 前阻断高风险路径。",
+        "支持基于 write-scope 或 touched files 生成本任务提交集。"
+      ]
+    },
+    {
+      "id": "integrations",
+      "name": "依赖与集成",
+      "type": "cloud",
+      "subtitle": "Git worktree 能力。 · 现有 loop task executionStrategy.writeScope 与 finish / verify 流程。 · OpenPrd 的状…",
+      "details": [
+        "Git worktree 能力。",
+        "现有 loop task executionStrategy.writeScope 与 finish / verify 流程。",
+        "OpenPrd 的状态文件、review / change / tasks 主流程。"
+      ]
+    },
+    {
+      "id": "governance",
+      "name": "约束与可靠性",
+      "type": "security",
+      "subtitle": "提交与状态写回不能泄露用户本地无关改动或敏感信息。",
+      "details": [
+        "提交与状态写回不能泄露用户本地无关改动或敏感信息。",
+        "默认路径必须安全，不能把无关改动静默卷入 commit。",
+        "行为必须可追踪，可从状态文件复原任务执行链路。"
+      ]
+    },
+    {
+      "id": "delivery",
+      "name": "验证与交接",
+      "type": "database",
+      "subtitle": "loop --run 可以显式创建或接入 worktree / branch，或提供等价包装入口。 · 主工作区脏时，loop --finish --commit 默认阻断，只有显式豁免才允…",
+      "details": [
+        "目标: OpenPrd",
+        "下一步: 完成 review 确认后生成 change 和 tasks，再实现 loop 的隔离 wor…",
+        "在隔离 worktree 中连续完成多个 loop 任务时，每个任务都能生成独立 commit，并把 commitSha 写回状态。",
+        "在脏主工作区直接尝试 finish --commit 时，会收到明确阻断和豁免提示。"
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "source": "users",
+      "target": "experience",
+      "label": "用户为一个 change 进入 loop 开发时，OpenPrd 可显式创建或…",
+      "type": "standard"
+    },
+    {
+      "source": "experience",
+      "target": "core",
+      "label": "产品动作与编排",
+      "type": "standard"
+    },
+    {
+      "source": "core",
+      "target": "integrations",
+      "label": "依赖与外部服务",
+      "type": "standard"
+    },
+    {
+      "source": "core",
+      "target": "governance",
+      "label": "策略、可靠性与合规",
+      "type": "security"
+    },
+    {
+      "source": "core",
+      "target": "delivery",
+      "label": "成功标准与交接",
+      "type": "standard"
+    },
+    {
+      "source": "integrations",
+      "target": "delivery",
+      "label": "运营就绪",
+      "type": "standard"
+    },
+    {
+      "source": "governance",
+      "target": "delivery",
+      "label": "评审与确认",
+      "type": "security"
+    }
+  ],
+  "summaryCards": [
+    {
+      "title": "范围",
+      "color": "frontend",
+      "items": [
+        "范围内: 给 openprd loop --run 增加显式 --worktree / --branch，或提供先创建隔离 worktree 再执行的包装入口。 / 在 commit 前增加主工作区脏状态门禁和显式 override 机制。 / 把提交范围从 git add -A 收窄到 task write-scope 或本轮 touched files。",
+        "范围外: 不在这次能力里自动 push、开 PR 或发布。 / 不做复杂的交互式冲突解决或自动合并策略。",
+        "主流程: 用户为一个 change 进入 loop 开发时，OpenPrd 可显式创建或接入隔离 worktree 与命名分支，再在其中逐任务运行和提交。 / 每个任务验证通过后执行 finish --commit，只提交当前任务 write-scope / touched files，并把 commit 信息写回状态。 / 评审或回归时，维护者可从状态文件直接定位 worktree、branch、commitSha 和测试报告。"
+      ]
+    },
+    {
+      "title": "架构检查",
+      "color": "backend",
+      "items": [
+        "核心逻辑: 支持显式 worktree / branch 配置，或提供隔离运行包装命令。 / 支持检测主工作区脏状态，并在 finish --commit 前阻断高风险路径。",
+        "依赖: Git worktree 能力。 / 现有 loop task executionStrategy.writeScope 与 finish / verify 流程。",
+        "约束: 提交与状态写回不能泄露用户本地无关改动或敏感信息。"
+      ]
+    },
+    {
+      "title": "评审重点",
+      "color": "cloud",
+      "items": [
+        "确认缺失假设: 第一版默认以一个 change / 一段 loop 对应一个隔离 worktree 为优先模型，而不是每个 task 一个 worktree。 / 已有 task write-scope 在多数实现任务里足够收窄 commit 范围；不足时需要 touched files 补位。",
+        "开放问题: 第一版是否明确采用一个 change 一个 worktree、一个 task 一个 commit。 / worktree / branch 命名规范是否要产品化成 CLI 默认值。 / override 脏仓库门禁时，CLI 需要多强的显式确认语义。",
+        "在需求定稿前请用户确认模块、边界和缺失系统。"
+      ]
+    }
+  ],
+  "sidePanels": [
+    {
+      "title": "假设",
+      "color": "database",
+      "items": [
+        "第一版默认以一个 change / 一段 loop 对应一个隔离 worktree 为优先模型，而不是每个 task 一个 worktree。",
+        "已有 task write-scope 在多数实现任务里足够收窄 commit 范围；不足时需要 touched files 补位。"
+      ]
+    },
+    {
+      "title": "评审说明",
+      "color": "cloud",
+      "items": [
+        "确认这些模块是否反映澄清后的目标架构。",
+        "标记缺失系统、边界或外部依赖。",
+        "在需求定稿前验证可靠性、合规和交接预期。"
+      ]
+    }
+  ],
+  "metadata": {
+    "projectName": "OpenPrd loop 隔离 worktree 提交闭环",
+    "productType": "agent",
+    "owner": "Codex",
+    "versionId": "v0006",
+    "targetSystem": "OpenPrd",
+    "reviewStatus": "pending-confirmation"
+  }
+}

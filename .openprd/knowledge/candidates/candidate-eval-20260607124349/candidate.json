@@ -1,9 +1,9 @@
 {
   "version": 1,
   "candidateId": "candidate-eval-20260607124349",
-  "status": "pending-review",
+  "status": "archived",
   "createdAt": "2026-06-07 12:43:54",
-  "updatedAt": "2026-06-07 12:50:41",
+  "updatedAt": "2026-06-12 13:12:11",
   "sourceKind": "diagnostic-report",
   "sourceRef": "candidate-eval-20260607124349",
   "title": "本轮项目回顾",
@@ -323,5 +323,10 @@
     "candidateDir": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/knowledge/candidates/candidate-eval-20260607124349",
     "draftSkill": "/Users/chaojifeng/Projects/harness-engineer/openprd/.openprd/knowledge/drafts/openprd-experience-diagnostic-candidate-eval-20260607124349/SKILL.md"
   },
-  "suggestedLearnCommand": "openprd quality . --learn --from .openprd/knowledge/candidates/candidate-eval-20260607124349"
+  "suggestedLearnCommand": "openprd quality . --learn --from .openprd/knowledge/candidates/candidate-eval-20260607124349",
+  "reviewedAt": "2026-06-12 13:12:11",
+  "reviewedBy": "codex",
+  "reviewDecision": "与同主题候选重复，由新指纹去重机制统一归并",
+  "reviewReason": "与同主题候选重复，由新指纹去重机制统一归并",
+  "archivedAt": "2026-06-12 13:12:11"
 }

@@ -1,0 +1,14 @@
+[
+  {
+    "title": "Inspect src/design-starter.js"
+  },
+  {
+    "title": "Inspect src/cli/quality-print.js"
+  },
+  {
+    "title": "Inspect test/openprd.test.js"
+  },
+  {
+    "title": "Inspect .openprd/design/templates/ops-dashboard.html"
+  }
+]

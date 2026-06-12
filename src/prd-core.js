@@ -242,11 +242,26 @@ export function buildPrdSnapshot(ws, options = {}) {
     validation: {
       community: normalizeArray(pickValue(options.community, state.community)),
       seedUsers: normalizeArray(pickValue(options.seedUsers, state.seedUsers)),
+      communityFit: normalizeArray(pickValue(options.communityFit, state.communityFit)),
       currentAlternative: pickValue(options.currentAlternative, state.currentAlternative, state.asIs),
+      painEvidence: normalizeArray(pickValue(options.painEvidence, state.painEvidence)),
       manualPath: normalizeArray(pickValue(options.manualPath, state.manualPath)),
+      manualPlaybook: normalizeArray(pickValue(options.manualPlaybook, state.manualPlaybook)),
       commitmentSignals: normalizeArray(pickValue(options.commitmentSignals, state.commitmentSignals)),
       firstValidationStep: pickValue(options.firstValidationStep, state.firstValidationStep, state.nextStep),
       defaultAlivePlan: normalizeArray(pickValue(options.defaultAlivePlan, state.defaultAlivePlan)),
+      paymentProof: normalizeArray(pickValue(options.paymentProof, state.paymentProof)),
+      mvpSlice: pickValue(options.mvpSlice, state.mvpSlice),
+      weekendTest: pickValue(options.weekendTest, state.weekendTest),
+      smallestExecution: normalizeArray(pickValue(options.smallestExecution, state.smallestExecution)),
+      productizeGate: normalizeArray(pickValue(options.productizeGate, state.productizeGate)),
+      firstCustomerPath: normalizeArray(pickValue(options.firstCustomerPath, state.firstCustomerPath)),
+      pricingHypothesis: pickValue(options.pricingHypothesis, state.pricingHypothesis),
+      customerOneProfitability: pickValue(options.customerOneProfitability, state.customerOneProfitability),
+      growthDiscipline: normalizeArray(pickValue(options.growthDiscipline, state.growthDiscipline)),
+      reversibility: pickValue(options.reversibility, state.reversibility),
+      customerTruth: pickValue(options.customerTruth, state.customerTruth),
+      valuesFit: pickValue(options.valuesFit, state.valuesFit),
     },
     scope: {
       inScope: normalizeArray(pickValue(options.inScope, state.inScope)),
@@ -379,11 +394,26 @@ export function renderPrdMarkdown(snapshot) {
     renderSection('验证与创业闭环', [
       ['可触达社区', sections.validation.community],
       ['第一批种子用户', sections.validation.seedUsers],
+      ['社区契合与触达依据', sections.validation.communityFit],
       ['当前替代方案', sections.validation.currentAlternative],
+      ['痛点与替代证据', sections.validation.painEvidence],
       ['手工交付路径', sections.validation.manualPath],
+      ['手工作战卡', sections.validation.manualPlaybook],
       ['承诺信号', sections.validation.commitmentSignals],
       ['首个低成本验证', sections.validation.firstValidationStep],
       ['先活下来方案', sections.validation.defaultAlivePlan],
+      ['付费验证信号', sections.validation.paymentProof],
+      ['第一版只做一件事', sections.validation.mvpSlice],
+      ['周末级验证', sections.validation.weekendTest],
+      ['最小工具桥接', sections.validation.smallestExecution],
+      ['产品化门槛', sections.validation.productizeGate],
+      ['第一批客户路径', sections.validation.firstCustomerPath],
+      ['初始收费假设', sections.validation.pricingHypothesis],
+      ['客户 1 盈利路径', sections.validation.customerOneProfitability],
+      ['销售与增长纪律', sections.validation.growthDiscipline],
+      ['可逆性判断', sections.validation.reversibility],
+      ['客户真问题校验', sections.validation.customerTruth],
+      ['价值观一致性', sections.validation.valuesFit],
     ]),
     renderSection('范围与非目标', [
       ['范围内', sections.scope.inScope],
@@ -477,6 +507,32 @@ const BUSINESS_GUARDRAIL_FIELD_DESCRIPTORS = [
   { section: 'businessGuardrails', path: 'businessGuardrails.stopLossActions', label: '止损动作', prompt: '触发异常后，应该降级、暂停、关闭哪些能力，谁来处理？' },
 ];
 
+
+const VALIDATION_REQUIRED_FIELD_DESCRIPTORS = [
+  { section: 'validation', path: 'validation.community', label: '第一批可触达人群', prompt: '第一批最容易触达的社区、渠道或人群是谁？' },
+  { section: 'validation', path: 'validation.seedUsers', label: '种子用户', prompt: '至少 3 到 10 个最该先找的人是谁？' },
+  { section: 'validation', path: 'validation.communityFit', label: '社区契合', prompt: '你为什么算这个社区里的自己人？你现在是否已经在真实参与或贡献，他们为什么愿意先相信你？' },
+  { section: 'validation', path: 'validation.currentAlternative', label: '当前替代方案', prompt: '用户现在主要靠什么替代方案、流程或人工方式在解决？' },
+  { section: 'validation', path: 'validation.painEvidence', label: '痛点证据', prompt: '这个问题到底有多痛，用户已经在为更差的办法花什么时间或金钱？' },
+  { section: 'validation', path: 'validation.manualPath', label: '手工交付路径', prompt: '如果先不做完整产品，怎么靠手工服务或半自动流程把价值跑出来？' },
+  { section: 'validation', path: 'validation.manualPlaybook', label: '手工作战卡', prompt: '触发条件、步骤、工具、耗时和交接点分别是什么？' },
+  { section: 'validation', path: 'validation.commitmentSignals', label: '承诺信号', prompt: '什么真实承诺最能证明这不是口头兴趣？' },
+  { section: 'validation', path: 'validation.firstValidationStep', label: '最低成本验证', prompt: '最低成本先验证哪一步最关键？' },
+  { section: 'validation', path: 'validation.defaultAlivePlan', label: '先活下来方案', prompt: '验证阶段怎样不把成本、复杂度和维护负担一下子做爆？' },
+  { section: 'validation', path: 'validation.paymentProof', label: '付费验证信号', prompt: '有没有 10 个样本、3/10 付费意愿或更强交易信号？' },
+  { section: 'validation', path: 'validation.mvpSlice', label: '一件事 MVP', prompt: '第一版到底只做哪一件事？' },
+  { section: 'validation', path: 'validation.weekendTest', label: '周末级验证', prompt: '能不能压成周末级 MVP、顾问式试跑或更轻验证？' },
+  { section: 'validation', path: 'validation.smallestExecution', label: '最小工具桥接', prompt: '能不能先用 spreadsheet、表单或 no-code 工具把第一版跑起来？如果必须开始做产品，也只自动化最重复的一步并先压成 forms / lists / CRUD 骨架；不要先为假想中的未来客户造复杂能力。' },
+  { section: 'validation', path: 'validation.productizeGate', label: '产品化门槛', prompt: '达到什么条件才允许继续产品化或加功能？先服务今天已经存在的重复需求，不要提前为未来规模开壳。' },
+  { section: 'validation', path: 'validation.firstCustomerPath', label: '第一批客户路径', prompt: '第一批客户最现实的触达顺序是什么？' },
+  { section: 'validation', path: 'validation.pricingHypothesis', label: '初始收费假设', prompt: '从第一个客户开始准备怎么收费？' },
+  { section: 'validation', path: 'validation.customerOneProfitability', label: '客户 1 盈利路径', prompt: '第一个客户如何覆盖时间和交付成本？' },
+  { section: 'validation', path: 'validation.growthDiscipline', label: '增长纪律', prompt: '销售、launch 和增长阶段准备守哪些纪律？' },
+  { section: 'validation', path: 'validation.reversibility', label: '可逆性', prompt: '如果结果一般，这条路是否容易回退？是否在逼你做重招聘、长期绑定或重平台化这类不可逆决策？' },
+  { section: 'validation', path: 'validation.customerTruth', label: '客户真问题', prompt: '这更像在解决客户真问题，还是满足内部冲动？' },
+  { section: 'validation', path: 'validation.valuesFit', label: '价值观一致性', prompt: '这条路是否符合团队想坚持的价值观和长期经营方式？如果连续这样做 3 到 5 年，你还愿意住在这套业务里吗？' },
+];
+
 const TYPE_REQUIRED_FIELD_DESCRIPTORS = {
   consumer: [
     { section: 'consumer', path: 'typeSpecific.fields.persona', label: '用户画像', prompt: '目标用户画像是什么？' },
@@ -535,8 +591,49 @@ function isMissingPrdValue(value) {
   return false;
 }
 
-export function getRequiredFieldDescriptors(productType) {
+function needsValidationLoop(snapshot) {
+  const sections = snapshot?.sections ?? {};
+  const validation = sections.validation ?? {};
+  const explicitValidationSignals = [
+    validation.community,
+    validation.seedUsers,
+    validation.communityFit,
+    validation.painEvidence,
+    validation.manualPath,
+    validation.manualPlaybook,
+    validation.commitmentSignals,
+    validation.defaultAlivePlan,
+    validation.paymentProof,
+    validation.mvpSlice,
+    validation.weekendTest,
+    validation.smallestExecution,
+    validation.productizeGate,
+    validation.firstCustomerPath,
+    validation.pricingHypothesis,
+    validation.customerOneProfitability,
+    validation.growthDiscipline,
+    validation.reversibility,
+    validation.customerTruth,
+    validation.valuesFit,
+  ];
+  if (explicitValidationSignals.some((value) => !isMissingPrdValue(value))) {
+    return true;
+  }
+  const text = flattenForSearch({
+    problem: sections.problem,
+    goals: sections.goals,
+    scope: sections.scope,
+    requirements: sections.requirements,
+    risks: sections.risks,
+  });
+  return /(创业|脑暴|brainstorm|0\s*(到|to)\s*1|值不值得|worth doing|种子用户|第一批(客户|用户)|社区|workaround|手工交付|顾问式|一件事\s*mvp|周末级|首批成交|default alive|productize|no-code|spreadsheet|first customer)/iu.test(text);
+}
+
+export function getRequiredFieldDescriptors(productType, options = {}) {
   const descriptors = [...BASE_REQUIRED_FIELD_DESCRIPTORS];
+  if (options.includeValidation) {
+    descriptors.push(...VALIDATION_REQUIRED_FIELD_DESCRIPTORS);
+  }
   if (TYPE_REQUIRED_FIELD_DESCRIPTORS[productType]) {
     descriptors.push(...TYPE_REQUIRED_FIELD_DESCRIPTORS[productType]);
   }
@@ -568,7 +665,8 @@ export function needsBusinessGuardrails(snapshot) {
 
 export function analyzePrdSnapshot(snapshot) {
   const productType = snapshot.productType ?? null;
-  const descriptors = getRequiredFieldDescriptors(productType);
+  const includeValidation = needsValidationLoop(snapshot);
+  const descriptors = getRequiredFieldDescriptors(productType, { includeValidation });
   if (needsBusinessGuardrails(snapshot)) {
     descriptors.push(...BUSINESS_GUARDRAIL_FIELD_DESCRIPTORS);
   }
@@ -596,6 +694,7 @@ export function analyzePrdSnapshot(snapshot) {
 
   return {
     productType,
+    includeValidation,
     totalRequiredFields,
     completedRequiredFields,
     missingRequiredFields: missingFields.length,

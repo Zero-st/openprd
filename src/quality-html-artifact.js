@@ -517,13 +517,38 @@ function exceptionItems(report) {
     }));
 }
 
+const EVIDENCE_SOURCE_LABELS = {
+  'openprd-tasks': '任务清单',
+  'project-scan': '项目扫描',
+  'openprd-knowledge': '项目经验库',
+  'openprd-knowledge-candidate': '待确认经验草案',
+  'openprd-growth-ledger': '成长记录',
+  'openprd-test-report': '测试报告',
+  'openprd-visual-review': '视觉对比记录',
+  evidence: '证据文件',
+};
+
+const EVIDENCE_PATH_LABELS = {
+  'no-active-change': '当前没有进行中的需求改动',
+  'no-cost-risk-detected': '本次没有发现成本相关风险',
+  'business-guardrails-evidence': '成本与滥用护栏证据',
+};
+
+function evidenceSourceLabel(source) {
+  return EVIDENCE_SOURCE_LABELS[source] ?? source;
+}
+
+function evidencePathLabel(path) {
+  return EVIDENCE_PATH_LABELS[path] ?? path;
+}
+
 function evidenceItems(report) {
   return evidenceRows(report)
     .filter((row) => !row.empty)
     .slice(0, 5)
     .map((row) => ({
       summary: gateDisplay(row.gate),
-      detail: `${row.source}，${row.path}`,
+      detail: `${evidenceSourceLabel(row.source)}，${evidencePathLabel(row.path)}`,
     }));
 }
 
@@ -573,8 +598,8 @@ function environmentItems(report) {
     {
       summary: '成长账本',
       detail: Number(growth.summary?.eventCount ?? 0) > 0
-        ? `已记录 ${growth.summary.eventCount} 条事件，completion checkpoint ${growth.summary.completionCheckpoints ?? 0} 条`
-        : '当前还没有成长账本事件；完成态至少应留下 checkpoint 或候选',
+        ? `已记录 ${growth.summary.eventCount} 条成长事件，其中收尾检查记录 ${growth.summary.completionCheckpoints ?? 0} 条`
+        : '当前还没有成长记录；收尾前至少应留下一条收尾检查记录或经验草案',
     },
   ];
 }
@@ -692,8 +717,8 @@ function tableRowsForEvidence(report) {
   return evidenceRows(report).map((row) => `
     <tr>
       <td>${escapeHtml(gateDisplay(row.gate))}</td>
-      <td>${escapeHtml(row.source)}</td>
-      <td><code>${escapeHtml(row.path)}</code></td>
+      <td>${escapeHtml(evidenceSourceLabel(row.source))}</td>
+      <td><code>${escapeHtml(evidencePathLabel(row.path))}</code></td>
       <td>${row.gate.required ? '本期必测' : '按风险确认'}</td>
     </tr>
   `).join('\n');

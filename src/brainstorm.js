@@ -180,16 +180,32 @@ function buildConfidenceLabel(currentState, benchmark, knowledge) {
     normalizedText(currentState.problemStatement),
     listOfStrings(currentState.primaryUsers).length > 0 ? 'users' : null,
     listOfStrings(currentState.community).length > 0 ? 'community' : null,
+    listOfStrings(currentState.communityFit).length > 0 ? 'community-fit' : null,
     normalizedText(currentState.currentAlternative || currentState.asIs) ? 'current-alternative' : null,
+    listOfStrings(currentState.painEvidence).length > 0 ? 'pain-evidence' : null,
+    listOfStrings(currentState.manualPath).length > 0 ? 'manual-path' : null,
+    listOfStrings(currentState.manualPlaybook).length > 0 ? 'manual-playbook' : null,
     listOfStrings(currentState.commitmentSignals).length > 0 ? 'commitment' : null,
     normalizedText(currentState.firstValidationStep || currentState.nextStep) ? 'validation-step' : null,
+    listOfStrings(currentState.paymentProof).length > 0 ? 'payment-proof' : null,
+    normalizedText(currentState.mvpSlice) ? 'mvp-slice' : null,
+    normalizedText(currentState.weekendTest) ? 'weekend-test' : null,
+    listOfStrings(currentState.smallestExecution).length > 0 ? 'smallest-execution' : null,
+    listOfStrings(currentState.productizeGate).length > 0 ? 'productize-gate' : null,
+    listOfStrings(currentState.firstCustomerPath).length > 0 ? 'first-customer-path' : null,
+    normalizedText(currentState.pricingHypothesis) ? 'pricing' : null,
+    normalizedText(currentState.customerOneProfitability) ? 'customer-one-profitability' : null,
+    listOfStrings(currentState.growthDiscipline).length > 0 ? 'growth-discipline' : null,
+    normalizedText(currentState.reversibility) ? 'reversibility' : null,
+    normalizedText(currentState.customerTruth) ? 'customer-truth' : null,
+    normalizedText(currentState.valuesFit) ? 'values-fit' : null,
     listOfStrings(currentState.goals).length > 0 ? 'goals' : null,
     listOfStrings(currentState.assumptions).length > 0 ? 'assumptions' : null,
     benchmark.counts.approved > 0 ? 'benchmark' : null,
     knowledge.counts.skills > 0 ? 'knowledge' : null,
   ].filter(Boolean).length;
-  if (signals >= 6) return '已经有较完整基础，可以开始整理 PRD';
-  if (signals >= 4) return '方向基本有了，但还差 1 轮确认';
+  if (signals >= 8) return '已经有较完整基础，可以开始整理 PRD';
+  if (signals >= 5) return '方向基本有了，但还差 1 轮确认';
   return '现在信息还不够，先继续把问题聊透';
 }
 
@@ -207,6 +223,15 @@ function buildFollowUpPrompts(currentState, workspaceScan) {
   if (listOfStrings(currentState.manualPath).length === 0) {
     prompts.push('先补一条不做完整产品时也能手工交付价值的路径。');
   }
+  if (listOfStrings(currentState.manualPlaybook).length === 0) {
+    prompts.push('先把手工作战卡写出来，至少补齐触发条件、步骤、工具、耗时和交接点。');
+  }
+  if (listOfStrings(currentState.communityFit).length === 0) {
+    prompts.push('先说清你为什么算这个社区里的自己人、他们在哪里聚集、为什么这个切口足够小，以及你现在是否已经在真实参与或贡献。');
+  }
+  if (listOfStrings(currentState.painEvidence).length === 0) {
+    prompts.push('先证明这个问题真的痛，用户现在已经在为更差的办法花时间或花钱。');
+  }
   if (listOfStrings(currentState.commitmentSignals).length === 0) {
     prompts.push('先定义什么真实承诺能证明这不是口头兴趣。');
   }
@@ -215,6 +240,42 @@ function buildFollowUpPrompts(currentState, workspaceScan) {
   }
   if (listOfStrings(currentState.defaultAlivePlan).length === 0) {
     prompts.push('先说清验证阶段怎样控制成本、时间和交付方式，确保这件事先活下来。');
+  }
+  if (listOfStrings(currentState.paymentProof).length === 0) {
+    prompts.push('先补有没有 10 个样本、3/10 付费意愿或更强交易信号。');
+  }
+  if (!normalizedText(currentState.mvpSlice)) {
+    prompts.push('先收敛第一版到底只做哪一件事。');
+  }
+  if (!normalizedText(currentState.weekendTest)) {
+    prompts.push('先判断这件事能不能压成周末级 MVP 或更轻试跑。');
+  }
+  if (listOfStrings(currentState.smallestExecution).length === 0) {
+    prompts.push('先说清能不能用 spreadsheet、表单或 no-code 工具把第一版跑起来；如果必须开始做产品，也只自动化最重复的一步，先压成 forms / lists / CRUD 骨架，不要先为假想中的未来客户造复杂能力。');
+  }
+  if (listOfStrings(currentState.productizeGate).length === 0) {
+    prompts.push('先写清达到什么条件才允许继续产品化或加功能，先服务今天已经存在的重复需求，不要提前为未来规模开壳。');
+  }
+  if (listOfStrings(currentState.firstCustomerPath).length === 0) {
+    prompts.push('先说清第一批客户最现实的触达顺序。');
+  }
+  if (!normalizedText(currentState.pricingHypothesis)) {
+    prompts.push('先给出一个从第一个客户开始就成立的收费假设。');
+  }
+  if (!normalizedText(currentState.customerOneProfitability)) {
+    prompts.push('先判断客户 1 怎么覆盖时间和交付成本。');
+  }
+  if (listOfStrings(currentState.growthDiscipline).length === 0) {
+    prompts.push('先约束增长纪律：先熟人还是先社区、什么时候不该 launch、什么时候别急着花钱。');
+  }
+  if (!normalizedText(currentState.reversibility)) {
+    prompts.push('先说清如果验证结果一般，这条路有多容易回退，会不会逼你做重招聘、长期绑定或重平台化这类不可逆决策。');
+  }
+  if (!normalizedText(currentState.customerTruth)) {
+    prompts.push('先判断这更像客户真问题，还是团队自己的技术冲动。');
+  }
+  if (!normalizedText(currentState.valuesFit)) {
+    prompts.push('先确认这条路是否符合团队现在想坚持的价值观和长期经营方式；如果连续这样做 3 到 5 年，你还愿意住在这套业务里吗？');
   }
   if (listOfStrings(currentState.goals).length === 0) {
     prompts.push('先把想达到的目标和判断标准说清楚。');
@@ -260,10 +321,25 @@ function buildBrainstormReport({ currentState, benchmark, knowledge, workspaceSc
   const community = listOfStrings(currentState.community);
   const seedUsers = listOfStrings(currentState.seedUsers);
   const currentAlternative = normalizedText(currentState.currentAlternative || currentState.asIs);
+  const communityFit = listOfStrings(currentState.communityFit);
+  const painEvidence = listOfStrings(currentState.painEvidence);
   const manualPath = listOfStrings(currentState.manualPath);
+  const manualPlaybook = listOfStrings(currentState.manualPlaybook);
   const commitmentSignals = listOfStrings(currentState.commitmentSignals);
   const firstValidationStep = normalizedText(currentState.firstValidationStep || currentState.nextStep);
   const defaultAlivePlan = listOfStrings(currentState.defaultAlivePlan);
+  const paymentProof = listOfStrings(currentState.paymentProof);
+  const mvpSlice = normalizedText(currentState.mvpSlice);
+  const weekendTest = normalizedText(currentState.weekendTest);
+  const smallestExecution = listOfStrings(currentState.smallestExecution);
+  const productizeGate = listOfStrings(currentState.productizeGate);
+  const firstCustomerPath = listOfStrings(currentState.firstCustomerPath);
+  const pricingHypothesis = normalizedText(currentState.pricingHypothesis);
+  const customerOneProfitability = normalizedText(currentState.customerOneProfitability);
+  const growthDiscipline = listOfStrings(currentState.growthDiscipline);
+  const reversibility = normalizedText(currentState.reversibility);
+  const customerTruth = normalizedText(currentState.customerTruth);
+  const valuesFit = normalizedText(currentState.valuesFit);
   const toBe = normalizedText(currentState.toBe);
   const whyNow = normalizedText(currentState.whyNow);
   const nextStep = normalizedText(currentState.nextStep);
@@ -284,12 +360,21 @@ function buildBrainstormReport({ currentState, benchmark, knowledge, workspaceSc
     ...(community.length > 0
       ? [`第一批最容易先验证的人群或社区是：${community.slice(0, 2).join('、')}。`]
       : ['当前还没锁定第一批最容易触达的人群或社区，建议先补最现实的反馈入口。']),
+    ...(communityFit.length > 0
+      ? [`你现在更适合先从这里切入：${communityFit.slice(0, 2).join('、')}。`]
+      : ['当前还没证明你为什么算这个社区里的自己人，建议先补“为什么现在就能触达”。']),
     ...(currentAlternative
       ? [`现在主要还是靠“${currentAlternative}”这类办法在撑着，先判断值不值得替换。`]
       : ['当前还没明确现在是怎么解决的，建议先补现有替代方案。']),
+    ...(painEvidence.length > 0
+      ? [`这个问题之所以值得做，主要证据是：${painEvidence.slice(0, 2).join('；')}。`]
+      : ['当前还没证明这个问题到底有多痛，建议先补真实痛点和现有成本。']),
     ...(whyNow
       ? [`现在提这件事，主要因为：${whyNow}`]
       : ['为什么现在要做还不够具体，建议先说清触发这件事的变化。']),
+    ...(mvpSlice
+      ? [`如果现在就动手，第一版最好只做“${mvpSlice}”这一件事。`]
+      : ['当前还没把第一版压成“一件事 MVP”，建议继续收范围。']),
   ];
   const directionOptions = [
     `推荐方向：${goalsDirection(currentState, topic)}。`,
@@ -301,6 +386,12 @@ function buildBrainstormReport({ currentState, benchmark, knowledge, workspaceSc
     ...(manualPath.length > 0
       ? [`不等完整产品也可以先这样交付价值：${manualPath.slice(0, 2).join('、')}。`]
       : ['如果还没准备好完整产品，建议先补一条手工服务或半自动交付路径。']),
+    ...(weekendTest
+      ? [`如果要压轻一点，可以先跑这样一个周末级验证：${weekendTest}。`]
+      : ['建议再压一层，先想清楚有没有周末级 MVP 或更轻的试跑方式。']),
+    ...(smallestExecution.length > 0
+      ? [`更小的第一版可以先这样跑：${smallestExecution.slice(0, 2).join('、')}。`]
+      : ['建议优先想清楚能不能先用 spreadsheet、表单或 no-code 跑起来；如果必须开始做产品，也只自动化最重复的一步，先压成 forms / lists / CRUD 骨架，不要先为假想中的未来客户造复杂能力。']),
     ...(inScope.length > 0
       ? [`这轮先聚焦：${inScope.slice(0, 2).join('、')}。`]
       : ['范围边界还不够清楚，建议先补“这轮先做什么、先不做什么”。']),
@@ -312,6 +403,12 @@ function buildBrainstormReport({ currentState, benchmark, knowledge, workspaceSc
       : []),
   ];
   const validationPlan = [
+    ...(communityFit.length > 0
+      ? communityFit.slice(0, 2).map((item) => `社区契合：${item}`)
+      : ['建议先证明你为什么算这个社区里的自己人、他们在哪里聚集、为什么这个切口够小，以及你现在是否已经在真实参与或贡献。']),
+    ...(manualPlaybook.length > 0
+      ? manualPlaybook.slice(0, 2).map((item) => `手工作战卡：${item}`)
+      : ['建议先把手工作战卡写出来，至少补齐触发条件、步骤、工具、耗时和交接点。']),
     ...(commitmentSignals.length > 0
       ? commitmentSignals.slice(0, 2).map((item) => `先看真实承诺：${item}`)
       : ['建议先定义什么真实承诺能证明这不是口头兴趣。']),
@@ -326,6 +423,15 @@ function buildBrainstormReport({ currentState, benchmark, knowledge, workspaceSc
       : openQuestions.length > 0
         ? [`低成本先验证最不确定的问题：${openQuestions[0]}`]
         : ['建议先定一个最低成本的验证动作，再决定是否进入完整 PRD。']),
+    ...(paymentProof.length > 0
+      ? paymentProof.slice(0, 2).map((item) => `付费验证：${item}`)
+      : ['建议先补有没有 10 个样本、3/10 付费意愿或更强交易信号。']),
+    ...(weekendTest
+      ? [`再压一层可以先做：${weekendTest}`]
+      : ['如果还太重，建议继续把验证动作压到周末级别。']),
+    ...(productizeGate.length > 0
+      ? productizeGate.slice(0, 2).map((item) => `产品化门槛：${item}`)
+      : ['建议先写清达到什么条件才允许继续产品化，而不是一有想法就继续扩。']),
     ...(stopLossActions.length > 0
       ? stopLossActions.slice(0, 2).map((item) => `如果验证不顺，先这样止损：${item}`)
       : ['如果验证结果不达预期，最好提前定义什么情况下先停。']),
@@ -334,26 +440,67 @@ function buildBrainstormReport({ currentState, benchmark, knowledge, workspaceSc
     ...(community.length > 0
       ? [`先去这里找真实反馈：${community.slice(0, 2).join('、')}。`]
       : ['先补第一批最容易触达的社区、渠道或人群。']),
+    ...(communityFit.length > 0
+      ? [`你更像这个圈子的自己人，因为：${communityFit.slice(0, 2).join('、')}。`]
+      : ['先补你为什么算这个社区里的自己人、他们为什么愿意先相信你。']),
     ...(seedUsers.length > 0
       ? [`第一批优先先找：${seedUsers.slice(0, 2).join('、')}。`]
       : ['先补第一批最值得先聊、先服务的人。']),
     ...(currentAlternative
       ? [`当前主要替代方案是：${currentAlternative}。`]
       : ['先补用户现在主要靠什么办法在解决。']),
+    ...(painEvidence.length > 0
+      ? [`痛点证据更像这样：${painEvidence.slice(0, 2).join('；')}。`]
+      : ['先补这个问题到底有多痛，用户现在已经在付出什么时间或金钱。']),
     ...(manualPath.length > 0
       ? [`先不做完整产品时，也可以这样手工交付：${manualPath.slice(0, 2).join('、')}。`]
       : ['先补一条不做完整产品也能交付价值的手工路径。']),
+    ...(manualPlaybook.length > 0
+      ? manualPlaybook.slice(0, 2).map((item) => `手工作战卡先这样写：${item}`)
+      : ['先补一版手工作战卡，把触发条件、步骤、工具、耗时和交接点写清楚。']),
+    ...(firstCustomerPath.length > 0
+      ? [`第一批客户更现实的顺序是：${firstCustomerPath.slice(0, 3).join(' -> ')}。`]
+      : ['先补第一批客户最现实的触达顺序，比如熟人、社区和陌生线索怎么排。']),
   ];
   const businessViability = [
     ...(commitmentSignals.length > 0
       ? commitmentSignals.slice(0, 2).map((item) => `先用这种承诺证明值得继续：${item}`)
       : ['先定义什么真实承诺最能证明值得继续。']),
+    ...(paymentProof.length > 0
+      ? paymentProof.slice(0, 2).map((item) => `付费证明：${item}`)
+      : ['先补 10 个样本里有没有 3/10 愿意付费、预付或给出更强承诺。']),
+    ...(pricingHypothesis
+      ? [`从第一个客户开始，先按这个方式收费：${pricingHypothesis}`]
+      : ['先给一个从第一个客户开始就成立的收费假设，不要无限期免费。']),
+    ...(customerOneProfitability
+      ? [`客户 1 的盈利或打平路径：${customerOneProfitability}`]
+      : ['先判断第一个客户怎么覆盖时间和交付成本。']),
     ...(defaultAlivePlan.length > 0
       ? defaultAlivePlan.slice(0, 2).map((item) => `先活下来要守住：${item}`)
       : ['先补验证阶段怎样控制成本、时间和交付方式，确保这件事先活下来。']),
     ...(firstValidationStep
       ? [`下一步最便宜的验证动作是：${firstValidationStep}`]
       : ['先定一个最低成本验证动作，再决定要不要继续做大。']),
+    ...(growthDiscipline.length > 0
+      ? growthDiscipline.slice(0, 2).map((item) => `增长纪律：${item}`)
+      : ['先约束增长纪律：先卖再 launch，先花时间别先花钱。']),
+  ];
+  const minimalistReview = [
+    ...(smallestExecution.length > 0
+      ? smallestExecution.slice(0, 2).map((item) => `更小的执行方式：${item}`)
+      : ['先判断能不能继续保持小：先用 spreadsheet、表单或 no-code 跑；如果必须开始做产品，也只自动化最重复的一步，先压成 forms / lists / CRUD 骨架，不要先为假想中的未来客户造复杂能力。']),
+    ...(productizeGate.length > 0
+      ? productizeGate.slice(0, 2).map((item) => `产品化条件：${item}`)
+      : ['先写清达到什么条件才允许产品化，别让功能冲动替代真实门槛。']),
+    ...(reversibility
+      ? [`如果结果一般，这条路的可逆性是：${reversibility}`]
+      : ['先判断如果验证结果一般，这条路是不是容易回退，避免先做重招聘、长期绑定或重平台化。']),
+    ...(customerTruth
+      ? [`客户真问题校验：${customerTruth}`]
+      : ['先判断这更像在解决客户真问题，还是团队自己的技术冲动。']),
+    ...(valuesFit
+      ? [`价值观一致性：${valuesFit}`]
+      : ['先确认这条路是否符合团队现在想坚持的价值观和长期经营方式；如果连续这样做 3 到 5 年，你还愿意住在这套业务里吗？']),
   ];
   const reuseFoundation = [
     ...(inScope.length > 0
@@ -395,6 +542,7 @@ function buildBrainstormReport({ currentState, benchmark, knowledge, workspaceSc
     marketSignals: directionOptions.slice(0, 8),
     validationLoop: validationLoop.slice(0, 8),
     businessViability: businessViability.slice(0, 8),
+    minimalistReview: minimalistReview.slice(0, 8),
     risks: validationPlan.slice(0, 8),
     reuseOpportunities: reuseFoundation.slice(0, 8),
     openQuestions: openQuestions.slice(0, 8),
@@ -524,6 +672,8 @@ export async function brainstormWorkspace(projectRoot, options = {}) {
       stakeholders: listOfStrings(currentState.stakeholders),
       community: listOfStrings(currentState.community),
       seedUsers: listOfStrings(currentState.seedUsers),
+      communityFit: listOfStrings(currentState.communityFit),
+      painEvidence: listOfStrings(currentState.painEvidence),
       goals: listOfStrings(currentState.goals),
       successMetrics: listOfStrings(currentState.successMetrics),
       inScope: listOfStrings(currentState.inScope),
@@ -534,9 +684,22 @@ export async function brainstormWorkspace(projectRoot, options = {}) {
       stopLossActions: listOfStrings(currentState.stopLossActions),
       currentAlternative: currentState.currentAlternative ?? '',
       manualPath: listOfStrings(currentState.manualPath),
+      manualPlaybook: listOfStrings(currentState.manualPlaybook),
       commitmentSignals: listOfStrings(currentState.commitmentSignals),
       firstValidationStep: currentState.firstValidationStep ?? '',
       defaultAlivePlan: listOfStrings(currentState.defaultAlivePlan),
+      paymentProof: listOfStrings(currentState.paymentProof),
+      mvpSlice: currentState.mvpSlice ?? '',
+      weekendTest: currentState.weekendTest ?? '',
+      smallestExecution: listOfStrings(currentState.smallestExecution),
+      productizeGate: listOfStrings(currentState.productizeGate),
+      firstCustomerPath: listOfStrings(currentState.firstCustomerPath),
+      pricingHypothesis: currentState.pricingHypothesis ?? '',
+      customerOneProfitability: currentState.customerOneProfitability ?? '',
+      growthDiscipline: listOfStrings(currentState.growthDiscipline),
+      reversibility: currentState.reversibility ?? '',
+      customerTruth: currentState.customerTruth ?? '',
+      valuesFit: currentState.valuesFit ?? '',
       asIs: currentState.asIs ?? '',
       toBe: currentState.toBe ?? '',
       nextStep: currentState.nextStep ?? '',

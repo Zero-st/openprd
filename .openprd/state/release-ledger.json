@@ -2,7 +2,7 @@
   "version": 1,
   "enabled": true,
   "strategy": "semver",
-  "currentVersion": "0.1.10",
+  "currentVersion": "0.1.11",
   "versions": [
     {
       "version": "0.1.2",
@@ -383,9 +383,9 @@
     },
     {
       "version": "0.1.10",
-      "status": "current",
+      "status": "released",
       "createdAt": "2026-06-07 12:54:33",
-      "updatedAt": "2026-06-07 12:54:33",
+      "updatedAt": "2026-06-12 18:41:53",
       "notes": null,
       "items": [
         {
@@ -401,8 +401,62 @@
         }
       ],
       "tag": null
+    },
+    {
+      "version": "0.1.11",
+      "status": "current",
+      "createdAt": "2026-06-12 18:41:53",
+      "updatedAt": "2026-06-12 18:42:41",
+      "notes": null,
+      "items": [
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "历史会话续接，让跨工作区继续任务能更稳定地找回原项目",
+          "sentence": "优化：历史会话续接，让跨工作区继续任务能更稳定地找回原项目",
+          "recordedAt": "2026-06-12 18:42:08",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1781260928376"
+          }
+        },
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "改进需求确认和评审继续流程，减少已经确认后的重复澄清",
+          "sentence": "优化：改进需求确认和评审继续流程，减少已经确认后的重复澄清",
+          "recordedAt": "2026-06-12 18:42:25",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1781260945008"
+          }
+        },
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "增强脑暴、图示和学习包产物，方便把过程沉淀成可回看的材料",
+          "sentence": "优化：增强脑暴、图示和学习包产物，方便把过程沉淀成可回看的材料",
+          "recordedAt": "2026-06-12 18:42:33",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1781260953413"
+          }
+        },
+        {
+          "type": "调整",
+          "summary": "调整",
+          "detail": "完善质量检查、经验沉淀和收尾提示，让发布前检查结果更清楚",
+          "sentence": "调整：完善质量检查、经验沉淀和收尾提示，让发布前检查结果更清楚",
+          "recordedAt": "2026-06-12 18:42:41",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1781260961288"
+          }
+        }
+      ],
+      "tag": null
     }
   ],
   "createdAt": "2026-06-02 21:28:04",
-  "updatedAt": "2026-06-07 12:54:33"
+  "updatedAt": "2026-06-12 18:42:41"
 }

@@ -1,8 +1,15 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-07 12:54:50",
+  "generatedAt": "2026-06-12 18:43:49",
   "nextReadyNode": "diagram",
   "workflow": [
+    {
+      "id": "brainstorm",
+      "label": "brainstorm",
+      "kind": "workflow-step",
+      "status": "ready",
+      "dependsOn": []
+    },
     {
       "id": "clarify",
       "label": "clarify",
@@ -103,6 +110,15 @@
       "dependsOn": []
     },
     {
+      "id": "brainstorm-file",
+      "label": "brainstorm.html",
+      "kind": "artifact",
+      "status": "ready",
+      "dependsOn": [
+        "brainstorm"
+      ]
+    },
+    {
       "id": "open-questions",
       "label": "open-questions.md",
       "kind": "record",
@@ -133,7 +149,7 @@
       "id": "architecture-diagram",
       "label": "architecture-diagram.html",
       "kind": "artifact",
-      "status": "ready",
+      "status": "done",
       "dependsOn": [
         "diagram"
       ]
@@ -204,6 +220,13 @@
     }
   ],
   "nodes": [
+    {
+      "id": "brainstorm",
+      "label": "brainstorm",
+      "kind": "workflow-step",
+      "status": "ready",
+      "dependsOn": []
+    },
     {
       "id": "clarify",
       "label": "clarify",
@@ -302,6 +325,15 @@
       "dependsOn": []
     },
     {
+      "id": "brainstorm-file",
+      "label": "brainstorm.html",
+      "kind": "artifact",
+      "status": "ready",
+      "dependsOn": [
+        "brainstorm"
+      ]
+    },
+    {
       "id": "open-questions",
       "label": "open-questions.md",
       "kind": "record",
@@ -332,7 +364,7 @@
       "id": "architecture-diagram",
       "label": "architecture-diagram.html",
       "kind": "artifact",
-      "status": "ready",
+      "status": "done",
       "dependsOn": [
         "diagram"
       ]
@@ -403,6 +435,11 @@
     }
   ],
   "edges": [
+    {
+      "from": "brainstorm",
+      "to": "brainstorm-file",
+      "relation": "produces"
+    },
     {
       "from": "clarify",
       "to": "classify",

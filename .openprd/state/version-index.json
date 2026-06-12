@@ -63,5 +63,18 @@
     "digest": "7f0e2d2730982a2ae96647d2377f6204e54f8adadf1b18b05f4bc7167046c575",
     "workUnitId": "wu-20260602132835-695429e8",
     "targetRoot": "/Users/chaojifeng/Projects/harness-engineer/openprd"
+  },
+  {
+    "versionNumber": 6,
+    "versionId": "v0006",
+    "createdAt": "2026-06-07 13:07:07",
+    "title": "OpenPrd loop 隔离 worktree 提交闭环",
+    "owner": "Codex",
+    "productType": "agent",
+    "templatePack": "agent",
+    "status": "synthesized",
+    "digest": "a3dbf01f4a3309d372002e417ffc2bc596b5e5c68a5a60c393547894ef72cefc",
+    "workUnitId": "wu-20260607130707-4f012e44",
+    "targetRoot": "/Users/chaojifeng/Projects/harness-engineer/openprd"
   }
 ]

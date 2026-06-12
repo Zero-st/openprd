@@ -19,7 +19,7 @@ function card(title, body) {
   `;
 }
 
-function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [], footer = '', statusBadge = null, topMeta = [] }) {
+function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [], footer = '', statusBadge = null, topMeta = [], bottomActions = [] }) {
   return `<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
@@ -29,26 +29,23 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
     <style>
       :root {
         color-scheme: light;
-        --bg: #f7f4ed;
-        --panel: rgba(255,255,255,0.88);
-        --text: #1f2937;
-        --muted: #6b7280;
-        --line: rgba(31,41,55,0.12);
-        --accent: #d97706;
-        --accent-soft: rgba(217,119,6,0.12);
+        --bg: #f6f8fb;
+        --panel: #ffffff;
+        --text: #172033;
+        --muted: #667085;
+        --line: #d8dee8;
+        --accent: #2563eb;
+        --accent-soft: rgba(37,99,235,0.1);
         --danger: #dc2626;
         --danger-soft: rgba(220,38,38,0.08);
         --ok: #15803d;
         --ok-soft: rgba(21,128,61,0.08);
         --mono: "JetBrains Mono","SFMono-Regular",Menlo,monospace;
-        --serif: "Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,serif;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        background:
-          radial-gradient(circle at top left, rgba(217,119,6,0.08), transparent 25%),
-          linear-gradient(180deg, #faf8f2 0%, var(--bg) 100%);
+        background: var(--bg);
         color: var(--text);
         font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       }
@@ -68,7 +65,7 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
         padding: 6px 12px;
         border-radius: 999px;
         border: 1px solid var(--line);
-        background: rgba(255,255,255,0.72);
+        background: #ffffff;
         color: var(--muted);
         font-size: 12px;
         letter-spacing: 0.08em;
@@ -129,10 +126,10 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
       }
       h1 {
         margin: 0;
-        font-size: clamp(34px, 5vw, 56px);
-        line-height: 1;
-        font-family: var(--serif);
-        font-weight: 600;
+        font-size: clamp(30px, 4.4vw, 46px);
+        line-height: 1.15;
+        font-weight: 700;
+        letter-spacing: -0.01em;
       }
       .subtitle {
         max-width: 880px;
@@ -161,10 +158,9 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
       }
       .card {
         border: 1px solid var(--line);
-        border-radius: 20px;
+        border-radius: 16px;
         background: var(--panel);
-        backdrop-filter: blur(8px);
-        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+        box-shadow: 0 10px 24px rgba(23,32,51,0.06);
         overflow: hidden;
       }
       .card-header {
@@ -178,10 +174,9 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
         padding: 12px 18px 18px;
       }
       .metric {
-        font-size: 30px;
-        line-height: 1.1;
-        font-family: var(--serif);
-        font-weight: 600;
+        font-size: 28px;
+        line-height: 1.15;
+        font-weight: 700;
       }
       .metric-sub {
         margin-top: 8px;
@@ -193,7 +188,7 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
         padding: 10px 12px;
         border-radius: 12px;
         border: 1px solid var(--line);
-        background: rgba(255,255,255,0.72);
+        background: #fbfcfe;
       }
       .mini-metric-value {
         font-size: 18px;
@@ -227,7 +222,7 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
         padding: 12px 14px;
         border-radius: 14px;
         border: 1px solid var(--line);
-        background: rgba(255,255,255,0.7);
+        background: #fbfcfe;
       }
       .qa-label,
       .option-title,
@@ -277,8 +272,9 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
         overflow-x: auto;
         padding: 14px;
         border-radius: 14px;
-        background: #161b22;
-        color: #e5e7eb;
+        border: 1px solid var(--line);
+        background: #f9fafb;
+        color: var(--text);
         font-family: var(--mono);
         font-size: 13px;
         line-height: 1.6;
@@ -288,6 +284,46 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
         color: var(--muted);
         font-size: 13px;
       }
+      .page-bottom-bar {
+        position: fixed;
+        inset-inline: 0;
+        bottom: 0;
+        z-index: 30;
+        padding: 14px 24px calc(14px + env(safe-area-inset-bottom));
+        background: rgba(246,248,251,0.92);
+        backdrop-filter: blur(8px);
+        border-top: 1px solid var(--line);
+      }
+      .page-bottom-bar-inner {
+        max-width: 980px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+      .page-bottom-action {
+        appearance: none;
+        border-radius: 12px;
+        padding: 10px 22px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: #ffffff;
+        color: var(--text);
+      }
+      .page-bottom-action.primary {
+        border-color: rgba(21,128,61,0.35);
+        background: var(--ok-soft);
+        color: var(--ok);
+      }
+      .page-bottom-action.danger {
+        border-color: rgba(220,38,38,0.35);
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+      .page-bottom-action:hover { filter: brightness(0.97); }
+      .has-bottom-bar { padding-bottom: 96px; }
       @media (max-width: 700px) {
         .page { padding: 20px 14px 40px; }
         .subtitle { font-size: 16px; }
@@ -295,7 +331,7 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
     </style>
   </head>
   <body>
-    <main class="page">
+    <main class="page${bottomActions.length ? ' has-bottom-bar' : ''}">
       <header class="hero">
         <div class="hero-topline">
           <div class="eyebrow">${escapeHtml(eyebrow)}</div>
@@ -308,6 +344,15 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
       <section class="summary-grid">${summaryCards.join('\n')}</section>
       <section class="section-grid">${sections.join('\n')}</section>
       ${footer ? `<div class="footer">${escapeHtml(footer)}</div>` : ''}
+      ${bottomActions.length ? `
+      <nav class="page-bottom-bar" aria-label="下一步反馈">
+        <div class="page-bottom-bar-inner">
+          ${bottomActions.map((action) => `
+          <button type="button" class="page-bottom-action ${escapeHtml(action.tone ?? 'primary')}" data-copy-value="${escapeHtml(action.copyText)}">
+            ${escapeHtml(action.label)}
+          </button>`).join('')}
+        </div>
+      </nav>` : ''}
       <script>
         document.querySelectorAll('[data-copy-target]').forEach((button) => {
           button.addEventListener('click', async () => {
@@ -317,6 +362,14 @@ function pageShell({ title, subtitle, eyebrow, summaryCards = [], sections = [],
             const old = button.textContent;
             button.textContent = '✓ 已复制';
             setTimeout(() => { button.textContent = old; }, 1200);
+          });
+        });
+        document.querySelectorAll('[data-copy-value]').forEach((button) => {
+          button.addEventListener('click', async () => {
+            await navigator.clipboard.writeText(button.dataset.copyValue || '');
+            const old = button.textContent;
+            button.textContent = '✓ 已复制，回到对话里粘贴给我';
+            setTimeout(() => { button.textContent = old; }, 1600);
           });
         });
       </script>
@@ -816,15 +869,99 @@ function renderReviewProjectVersion(projectRelease) {
   `;
 }
 
-function renderReviewOverview(snapshot, sectionsData) {
+function renderReviewOverview(snapshot, sectionsData, agenda = []) {
   const problem = sectionsData.problem?.problemStatement || '尚未形成明确问题定义';
+  const goal = reviewList(sectionsData.goals?.goals)[0] ?? null;
+  const agendaMarkup = agenda.length === 0 ? '' : `
+      <aside class="review-agenda" aria-label="评审清单">
+        <p class="review-agenda-title">这次评审要确认 ${agenda.length} 块内容</p>
+        <ol class="review-agenda-list">
+          ${agenda.map((item) => `
+          <li>
+            <a href="#review-panel-${escapeHtml(item.kind)}">
+              <span class="review-agenda-name">${escapeHtml(item.title)}</span>
+              <span class="review-agenda-count${item.count === 0 ? ' empty' : ''}">${item.count === 0 ? '暂无内容' : `${item.count} 条`}</span>
+            </a>
+          </li>`).join('')}
+        </ol>
+        <p class="review-agenda-foot">逐块看完后，用页面底部的按钮告诉我结论就可以。</p>
+      </aside>
+  `;
   return `
     <section class="review-overview" aria-labelledby="reviewOverviewTitle">
       <div class="review-overview-copy">
         <p class="review-kicker">需求概览</p>
         <h1 id="reviewOverviewTitle">${escapeHtml(snapshot.title || 'PRD 评审')}</h1>
         <p class="review-problem">${escapeHtml(problem)}</p>
+        ${goal ? `<p class="review-goal"><span class="review-goal-label">这次的目标</span>${escapeHtml(goal)}</p>` : ''}
       </div>
+      ${agendaMarkup}
+    </section>
+  `;
+}
+
+const REVIEW_GAP_PLACEHOLDER = /^待(补充|澄清|确认)/;
+
+const REVIEW_GAP_FIELDS = [
+  { path: ['problem', 'problemStatement'], label: '问题定义', hint: '还没说清楚这次要解决什么问题', priority: 1 },
+  { path: ['goals', 'goals'], label: '目标', hint: '还没说清楚这次想达成什么', priority: 1 },
+  { path: ['scope', 'inScope'], label: '范围内', hint: '还没列出这次要做的内容', priority: 1 },
+  { path: ['scenarios', 'primaryFlows'], label: '主流程', hint: '还没把用户怎么走完整个流程讲清楚', priority: 1 },
+  { path: ['goals', 'successMetrics'], label: '成功指标', hint: '还没定义怎么算做成了', priority: 2 },
+  { path: ['scope', 'outOfScope'], label: '范围外', hint: '还没说清楚这次明确不做什么', priority: 2 },
+  { path: ['requirements', 'functional'], label: '功能需求', hint: '还没列出必须交付的功能', priority: 2 },
+  { path: ['scenarios', 'edgeCases'], label: '边界情况', hint: '还没考虑特殊情况怎么处理', priority: 3 },
+  { path: ['scenarios', 'failureModes'], label: '失败路径', hint: '还没说清楚出错后怎么恢复', priority: 3 },
+];
+
+function reviewGapFieldMissing(sectionsData, field) {
+  const raw = sectionsData?.[field.path[0]]?.[field.path[1]];
+  if (Array.isArray(raw)) {
+    const items = reviewList(raw);
+    return items.length === 0 || items.every((item) => REVIEW_GAP_PLACEHOLDER.test(item));
+  }
+  const text = String(raw ?? '').trim();
+  return !text || REVIEW_GAP_PLACEHOLDER.test(text);
+}
+
+export function collectReviewGaps(sectionsData) {
+  return REVIEW_GAP_FIELDS
+    .filter((field) => reviewGapFieldMissing(sectionsData ?? {}, field))
+    .sort((a, b) => a.priority - b.priority);
+}
+
+function renderReviewGapPanel(sectionsData) {
+  const gaps = collectReviewGaps(sectionsData);
+  if (gaps.length === 0) {
+    return `
+    <section class="review-gap review-gap-clear" aria-label="信息完整度">
+      <div class="review-gap-headline">
+        <span class="review-gap-dot" aria-hidden="true"></span>
+        <strong>核心信息已补齐</strong>
+        <span class="review-gap-sub">问题、目标、范围和主流程都已经写清楚，可以放心往下确认。</span>
+      </div>
+    </section>
+  `;
+  }
+  const blocking = gaps.filter((gap) => gap.priority === 1).length;
+  const subText = blocking > 0
+    ? '其中带「关键」标记的内容建议先补齐，再做确认。'
+    : '都不是拦路的问题，但确认前补上会更稳。';
+  return `
+    <section class="review-gap review-gap-pending" aria-label="信息完整度">
+      <div class="review-gap-headline">
+        <span class="review-gap-dot" aria-hidden="true"></span>
+        <strong>确认前还差 ${gaps.length} 件事</strong>
+        <span class="review-gap-sub">${escapeHtml(subText)}</span>
+      </div>
+      <ol class="review-gap-list">
+        ${gaps.map((gap) => `
+        <li class="review-gap-item">
+          <span class="review-gap-tag${gap.priority === 1 ? ' review-gap-tag-key' : ''}">${gap.priority === 1 ? '关键' : '建议'}</span>
+          <strong>${escapeHtml(gap.label)}</strong>
+          <span class="review-gap-hint">${escapeHtml(gap.hint)}</span>
+        </li>`).join('')}
+      </ol>
     </section>
   `;
 }
@@ -1121,14 +1258,16 @@ function reviewSubtitleText(value) {
 }
 
 function renderReviewPanel({ kind, title, description, items, emptyText, visual = '' }) {
+  const itemCount = Array.isArray(items) ? items.filter(Boolean).length : 0;
   return `
-    <section class="review-panel review-panel-${escapeHtml(kind)}">
+    <section class="review-panel review-panel-${escapeHtml(kind)}" id="review-panel-${escapeHtml(kind)}">
       <header class="review-panel-head">
         ${reviewIcon(kind)}
         <div>
           <h3>${escapeHtml(title)}</h3>
           <p>${escapeHtml(reviewSubtitleText(description))}</p>
         </div>
+        <span class="review-panel-count${itemCount === 0 ? ' empty' : ''}" aria-label="条目数">${itemCount === 0 ? '暂无' : `${itemCount} 条`}</span>
       </header>
       <div class="review-chip-row" aria-label="${escapeHtml(title)}重点摘要">
         ${reviewHighlightChips(items, emptyText)}
@@ -1267,37 +1406,43 @@ function renderReviewPage({ snapshot, sectionsData, projectRelease }) {
     ...reviewList(sectionsData.risks?.risks),
     ...reviewList(sectionsData.risks?.openQuestions),
   ]);
-  const panels = [
-    renderReviewPanel({
+  const panelSpecs = [
+    {
       kind: 'flow',
       title: '主流程与边界情况',
       description: '确认用户旅程、关键步骤和恢复路径是否已经讲清楚，能否进入实现前确认',
       emptyText: '暂无主流程、边界情况或失败路径。',
       visual: renderReviewJourneySvg({ primaryFlows, edgeCases, failureModes }),
       items: flowPanelItems,
-    }),
-    renderReviewPanel({
+    },
+    {
       kind: 'function',
       title: '功能与约束',
       description: '区分必须交付、非功能要求和当前依赖假设',
       emptyText: '暂无功能、非功能要求或依赖约束。',
       items: functionPanelItems,
-    }),
-    renderReviewPanel({
+    },
+    {
       kind: 'guardrail',
       title: '业务成本与滥用护栏',
       description: '涉及免费额度、消耗型成本或第三方调用时，先确认限制、报警和止损动作',
       emptyText: '暂无业务成本或滥用护栏。',
       items: guardrailPanelItems,
-    }),
-    renderReviewPanel({
+    },
+    {
       kind: 'risk',
       title: '开放问题与风险',
       description: '需求定稿前还没关掉的问题要留在这里，不要默默假定解决',
       emptyText: '暂无假设、风险或开放问题。',
       items: riskPanelItems,
-    }),
+    },
   ];
+  const panelAgenda = panelSpecs.map((spec) => ({
+    kind: spec.kind,
+    title: spec.title,
+    count: Array.isArray(spec.items) ? spec.items.filter(Boolean).length : 0,
+  }));
+  const panels = panelSpecs.map((spec) => renderReviewPanel(spec));
   return `<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
@@ -1399,8 +1544,115 @@ function renderReviewPage({ snapshot, sectionsData, projectRelease }) {
         box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
       }
       .review-overview {
-        display: block;
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr);
+        gap: 24px;
+        align-items: start;
         padding: 24px;
+      }
+      .review-goal {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 8px;
+        max-width: 760px;
+        margin: 14px 0 0;
+        color: var(--review-text);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+      .review-goal-label {
+        flex-shrink: 0;
+        padding: 2px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(37,99,235,0.3);
+        background: rgba(37,99,235,0.06);
+        color: var(--review-blue);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .review-agenda {
+        padding: 16px 18px;
+        border-radius: 14px;
+        border: 1px solid var(--review-line);
+        background: var(--review-panel-soft);
+      }
+      .review-agenda-title {
+        margin: 0;
+        color: var(--review-text);
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .review-agenda-list {
+        margin: 12px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 6px;
+        counter-reset: agenda;
+      }
+      .review-agenda-list li { counter-increment: agenda; }
+      .review-agenda-list a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        color: var(--review-text);
+        text-decoration: none;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .review-agenda-list a::before {
+        content: counter(agenda);
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: rgba(37,99,235,0.1);
+        color: var(--review-blue);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .review-agenda-list a:hover {
+        border-color: var(--review-line);
+        background: #ffffff;
+      }
+      .review-agenda-name { flex: 1; min-width: 0; }
+      .review-agenda-count {
+        flex-shrink: 0;
+        color: var(--review-blue);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .review-agenda-count.empty { color: var(--review-muted); font-weight: 400; }
+      .review-agenda-foot {
+        margin: 12px 0 0;
+        color: var(--review-muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .review-panel-count {
+        flex-shrink: 0;
+        margin-left: auto;
+        padding: 3px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(37,99,235,0.25);
+        background: rgba(37,99,235,0.06);
+        color: var(--review-blue);
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .review-panel-count.empty {
+        border-color: var(--review-line);
+        background: var(--review-panel-soft);
+        color: var(--review-muted);
+        font-weight: 400;
       }
       .review-overview-copy,
       .review-panel {
@@ -1426,6 +1678,83 @@ function renderReviewPage({ snapshot, sectionsData, projectRelease }) {
         font-size: 16px;
         line-height: 1.75;
         overflow-wrap: anywhere;
+      }
+      .review-gap {
+        margin-top: 18px;
+        padding: 18px 20px;
+        border-radius: 16px;
+        border: 1px solid var(--review-line);
+        background: var(--review-panel);
+        box-shadow: 0 10px 24px rgba(23,32,51,0.05);
+      }
+      .review-gap-clear {
+        border-color: rgba(21,128,61,0.3);
+        background: #f2fbf5;
+      }
+      .review-gap-pending {
+        border-color: rgba(180,83,9,0.3);
+        background: #fffaf2;
+      }
+      .review-gap-headline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 10px;
+        font-size: 16px;
+      }
+      .review-gap-headline strong {
+        color: var(--review-text);
+        font-size: 17px;
+      }
+      .review-gap-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        align-self: center;
+      }
+      .review-gap-clear .review-gap-dot { background: var(--review-green); }
+      .review-gap-pending .review-gap-dot { background: var(--review-amber); }
+      .review-gap-sub {
+        color: var(--review-muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .review-gap-list {
+        margin: 14px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 8px;
+      }
+      .review-gap-item {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(180,83,9,0.16);
+        background: rgba(255,255,255,0.75);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .review-gap-item strong { color: var(--review-text); }
+      .review-gap-hint { color: var(--review-muted); }
+      .review-gap-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--review-line);
+        background: #ffffff;
+        color: var(--review-muted);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .review-gap-tag-key {
+        border-color: rgba(220,38,38,0.35);
+        color: var(--review-red);
+        background: rgba(220,38,38,0.06);
       }
       .review-map {
         margin-top: 18px;
@@ -1797,7 +2126,8 @@ function renderReviewPage({ snapshot, sectionsData, projectRelease }) {
         <div class="review-brand">OpenPrd / 评审面板</div>
         ${renderReviewProjectVersion(visibleProjectRelease)}
       </header>
-      ${renderReviewOverview(snapshot, sectionsData)}
+      ${renderReviewOverview(snapshot, sectionsData, panelAgenda)}
+      ${renderReviewGapPanel(sectionsData)}
       ${renderReviewFlowSvg(snapshot, sectionsData)}
       <section class="review-panel-grid" aria-label="固定评审项">
         ${panels.join('\n')}
@@ -1945,12 +2275,12 @@ export function renderPlaygroundArtifact({ snapshot, state, markdownPath, patchP
     <style>
       :root {
         color-scheme: light;
-        --bg: #fffaf0;
+        --bg: #f6f8fb;
         --panel: #ffffff;
-        --line: rgba(15,23,42,0.12);
-        --text: #1f2937;
-        --muted: #6b7280;
-        --accent: #0f766e;
+        --line: #d8dee8;
+        --text: #172033;
+        --muted: #667085;
+        --accent: #2563eb;
       }
       * { box-sizing: border-box; }
       body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
@@ -1967,8 +2297,8 @@ export function renderPlaygroundArtifact({ snapshot, state, markdownPath, patchP
       textarea { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 12px; font: inherit; line-height: 1.6; resize: vertical; }
       .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
       button { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: #fff; cursor: pointer; }
-      .primary { background: #0f766e; color: #fff; border-color: #0f766e; }
-      pre { margin: 0; border-radius: 14px; background: #111827; color: #e5e7eb; padding: 14px; overflow: auto; white-space: pre-wrap; line-height: 1.6; font-size: 13px; }
+      .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+      pre { margin: 0; border-radius: 14px; border: 1px solid var(--line); background: #f9fafb; color: var(--text); padding: 14px; overflow: auto; white-space: pre-wrap; line-height: 1.6; font-size: 13px; }
       .hint { color: var(--muted); font-size: 13px; line-height: 1.6; }
       .top-meta {
         display: flex;
@@ -1982,7 +2312,7 @@ export function renderPlaygroundArtifact({ snapshot, state, markdownPath, patchP
         padding: 6px 10px;
         border-radius: 999px;
         border: 1px solid var(--line);
-        background: rgba(255,255,255,0.85);
+        background: #ffffff;
         color: var(--muted);
         font-size: 12px;
       }
@@ -2180,14 +2510,29 @@ export function renderReviewArtifact({ snapshot, projectRelease = null }) {
 
 export function renderRegressionArtifact({ task, report }) {
   const passed = report.summary.failed === 0;
+  const failedCases = (report.cases ?? []).filter((item) => !item.passed);
   const summaryCards = [
     metricCard('任务', task.id, task.title),
     metricCard('验证方式', report.kind || 'command', report.verifyCommand || '未指定'),
     metricCard('通过用例', `${report.summary.passed}/${report.summary.total}`, '本次回归通过的测试用例数量'),
     metricCard('失败用例', `${report.summary.failed}`, '需要继续修复或补证据的测试用例数量'),
   ];
+  const verdictCard = card('这次验证的结论', passed
+    ? `
+      <div class="qa-item success">
+        <div class="qa-label">全部 ${report.summary.total} 个用例都通过了</div>
+        <div class="qa-meta">这部分功能按预期工作，可以放心进入下一步。想继续推进就用底部按钮告诉我。</div>
+      </div>
+    `
+    : `
+      <div class="qa-item warning">
+        <div class="qa-label">还有 ${report.summary.failed} 个用例没有通过</div>
+        <div class="qa-meta">没过的是：${failedCases.map((item) => escapeHtml(item.title || item.id)).join('、') || '见下方清单'}。建议先让我继续修复，再重新跑一次验证。</div>
+      </div>
+    `);
 
   const sections = [
+    verdictCard,
     card('回归用例清单', report.cases.map((item) => `
       <div class="qa-item ${item.passed ? 'success' : 'warning'}">
         <div class="qa-label">${escapeHtml(item.id)} · ${escapeHtml(item.title)}</div>
@@ -2226,6 +2571,14 @@ export function renderRegressionArtifact({ task, report }) {
     summaryCards,
     sections,
     footer: '',
+    bottomActions: passed
+      ? [
+        { label: '确认通过，继续下一步', tone: 'primary', copyText: `回归报告 ${task.id} 我看过了，全部用例通过，确认继续推进下一步。` },
+      ]
+      : [
+        { label: '先修复未通过的用例', tone: 'danger', copyText: `回归报告 ${task.id} 里还有 ${report.summary.failed} 个用例没通过（${failedCases.map((item) => item.id).join('、')}），请继续修复后重新跑一次验证。` },
+        { label: '我接受现状，继续下一步', tone: 'neutral', copyText: `回归报告 ${task.id} 的未通过用例我已知晓，先按现状继续推进，后续再处理。` },
+      ],
   });
 }
 

@@ -204,20 +204,26 @@ function printKnowledgeResult(result, json) {
     const counts = result.counts ?? {};
     console.log(`OpenPrd knowledge candidates: ${result.candidates.length} 个 (${result.status})`);
     console.log(`统计: pending ${counts.pending ?? 0}, promoted ${counts.promoted ?? 0}, rejected ${counts.rejected ?? 0}, archived ${counts.archived ?? 0}, reviewed ${counts.reviewed ?? 0}, total ${counts.total ?? 0}`);
-    for (const candidate of result.candidates) {
-      console.log(`- ${candidate.candidateId}: ${candidate.title ?? candidate.candidateId}`);
-      console.log(`  状态: ${candidate.status}`);
+    const ordered = [...result.candidates].sort((left, right) => (right.occurrences ?? 1) - (left.occurrences ?? 1));
+    for (const candidate of ordered) {
+      const occurrences = candidate.occurrences ?? 1;
+      const repeatNote = occurrences > 1 ? `（同类经验已重复出现 ${occurrences} 次，值得优先保留）` : '';
+      console.log(`- ${candidate.title ?? candidate.candidateId}${repeatNote}`);
+      console.log(`  编号: ${candidate.candidateId} · 状态: ${candidate.status}`);
       console.log(`  候选: ${candidate.path ?? candidate.files?.candidate}`);
       if (candidate.draftSkillPath ?? candidate.files?.draftSkill) {
         console.log(`  草案 Skill: ${candidate.draftSkillPath ?? candidate.files?.draftSkill}`);
       }
       if (candidate.pending) {
+        console.log(`  保留: openprd quality . --learn --review --from ${candidate.files?.candidateDir ?? candidate.candidateId}`);
         console.log(`  拒绝: openprd knowledge reject --id ${candidate.candidateId} --reason <原因>`);
         console.log(`  归档: openprd knowledge archive --id ${candidate.candidateId} --reason <原因>`);
       }
     }
     if (result.candidates.length === 0) {
       console.log('没有匹配的 knowledge candidate。');
+    } else if (ordered.some((candidate) => candidate.pending)) {
+      console.log('给用户的确认话术: 只要回复「保留第 N 条」或「忽略第 N 条」，Agent 就会执行对应命令，不需要手动操作。');
     }
     return;
   }

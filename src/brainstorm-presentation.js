@@ -68,13 +68,23 @@ export const BRAINSTORM_PRESENTATION_TEMPLATE = {
     ],
     validationLoop: [
       { summary: '先找谁验', detail: '先补第一批最容易触达、最可能给真实反馈的人。' },
-      { summary: '当前替代', detail: '先说清用户现在主要靠什么办法在解决。' },
-      { summary: '手工路径', detail: '先补不做完整产品时也能交付价值的手工路径。' },
+      { summary: '为什么是你', detail: '先说清你为什么算这个社区里的自己人、为什么现在就能触达。' },
+      { summary: '当前替代', detail: '先说清用户现在主要靠什么办法在解决，以及这个办法到底多痛。' },
+      { summary: '手工作战卡', detail: '把触发条件、步骤、工具、耗时和交接点先写清楚。' },
     ],
     businessViability: [
       { summary: '承诺信号', detail: '先定义什么真实承诺最能证明值得继续。' },
+      { summary: '付费证明', detail: '先补有没有 10 个样本、3/10 愿意付费或更强交易信号。' },
       { summary: '最低成本验证', detail: '优先写最便宜的验证动作，不要一上来做全套方案。' },
-      { summary: '先活下来', detail: '先说清验证阶段怎样控制成本、时间和交付方式。' },
+      { summary: '先怎么收费', detail: '先给一个从第一个客户开始就成立的收费假设。' },
+      { summary: '增长纪律', detail: '先约束什么时候不该 launch、什么时候别急着花钱或扩团队。' },
+    ],
+    minimalistReview: [
+      { summary: '更小的执行', detail: '先判断能不能继续用 spreadsheet、表单或 no-code 保持小；如果必须开始做产品，也只自动化最重复的一步并先压成 forms / lists / CRUD 骨架，不要先为假想中的未来客户造复杂能力。' },
+      { summary: '产品化门槛', detail: '先写清达到什么条件才允许继续产品化或加功能。' },
+      { summary: '是否可逆', detail: '先判断验证结果一般时，这条路是不是容易回退，避免先做重招聘、长期绑定或重平台化。' },
+      { summary: '客户真问题', detail: '先看这更像客户痛点，还是团队自己的技术冲动。' },
+      { summary: '价值观一致', detail: '先确认这条路是否符合团队想坚持的做法，以及它是不是你愿意长期住进去的业务形态。' },
     ],
     reuseOpportunities: [
       { summary: '现有基础', detail: '指出现在已经有什么能直接借，不要默认从零开始。' },
@@ -90,7 +100,7 @@ export const BRAINSTORM_PRESENTATION_TEMPLATE = {
 
 export function buildBrainstormPresentationTemplatePayload() {
   return {
-    intent: 'Agent 先按这个模板写 brainstormPresentation，再用本脚本校验；页面重点不只是整理需求，还要把当前替代方案、推荐方向、关键前提、验证动作和止损线说清楚。除了正文卡片，还可以用 visualScenes 生成更灵活的可视化区域，但仍然要走统一契约，不直接手写任意 SVG。',
+    intent: 'Agent 先按这个模板写 brainstormPresentation，再用本脚本校验；页面重点不只是整理需求，还要把当前替代方案、社区契合、痛点证据、手工作战卡、一件事 MVP、最小工具桥接、首批成交、产品化门槛、增长纪律、关键前提、验证动作和止损线说清楚。除了正文卡片，还可以用 visualScenes 生成更灵活的可视化区域，但仍然要走统一契约，不直接手写任意 SVG。',
     presentationTemplate: BRAINSTORM_PRESENTATION_TEMPLATE,
     presentationContract: BRAINSTORM_PRESENTATION_CONTRACT,
   };

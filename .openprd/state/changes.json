@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "activeChange": "adaptive-project-framing",
-  "updatedAt": "2026-06-02 15:03:05",
+  "activeChange": "loop-isolated-worktree-commit",
+  "updatedAt": "2026-06-07 13:11:18",
   "changes": {
     "verify-boundaries-and-historical-refresh": {
       "id": "verify-boundaries-and-historical-refresh",
@@ -22,6 +22,11 @@
       "id": "adaptive-project-framing",
       "status": "active",
       "activatedAt": "2026-06-02 15:03:05"
+    },
+    "loop-isolated-worktree-commit": {
+      "id": "loop-isolated-worktree-commit",
+      "status": "active",
+      "activatedAt": "2026-06-07 13:11:18"
     }
   }
 }

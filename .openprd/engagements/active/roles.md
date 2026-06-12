@@ -3,20 +3,20 @@
 ## 用户
 
 - 主要用户:
-- 第一次用 OpenPrd 梳理产品想法的产品经理、独立开发者与 Vibe Coding 用户
-- 需要在模糊需求下帮助用户收敛方向并继续落地的 Agent 协作者
+- 需要用 OpenPrd loop 执行中等到长程实现的维护者
+- 希望逐任务 commit、可审查、可回归且不污染主工作区的 Agent 协作者
 
 - 次要用户:
 - 待补充
 
 - 相关方:
-- 维护 OpenPrd requirement-intake、workflow 和模板的开发者
-- 后续需要基于已确认上下文继续实现的多轮 Agent 会话
+- OpenPrd 维护者
+- 在脏仓库或长程任务中依赖 loop 的项目协作者
 
 ## 类型专项
 
-- humanAgentContract: Agent 先归纳用户群体、产品形态、第一版切片、边界与风险，再请求用户确认；如果信息不足，只能提出候选方向，不能把猜测当成定论。
-- autonomyBoundary: Agent 可以根据当前需求和已有工作区状态推断首轮项目画像，但在用户确认前不得把推断直接写成最终需求事实或越过需求入口去改实现。
-- toolBoundary: 仅使用本地 OpenPrd workflow、模板、测试和文档完成这次改动，不依赖新的外部运行时。
-- stateModel: 新需求进入时先形成 project framing，再进入 requirement clarification、review/change/tasks 与实现。
-- evalPlan: 通过 workspace flow、requirement gate、CLI 输出和模板相关测试验证新流程，同时运行 dev-check、standards、quality 与 run verify。
+- humanAgentContract: 用户决定是否进入 loop、是否要求 commit、是否接受 override；Agent 负责在安全前提下创建隔离执行环境，并维护状态与证据闭环。
+- autonomyBoundary: Agent 可以在 loop 运行前准备 worktree、检查脏状态并收集 touched files，但不能在用户未授权 commit 的情况下自动提交，也不能在高风险脏仓库里静默绕过门禁。
+- toolBoundary: 优先使用本地 Git 与 OpenPrd loop 状态完成这次能力，不引入新的远端托管或发布前置依赖。
+- stateModel: change 进入 loop 后，先绑定隔离执行环境，再逐任务 run / verify / finish / commit，并把 worktree、branch、commit 与测试报告写回同一条状态链。
+- evalPlan: 通过 loop 单测、worktree / dirty repo 场景测试、状态持久化测试，以及一次真实隔离 worktree 的串行回归验证这次改动。

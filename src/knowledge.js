@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { appendJsonl, cjoin, exists, readJson, readJsonl, writeJson, writeText } from './fs-utils.js';
@@ -858,16 +859,55 @@ function deriveKnowledgeNames(source, options = {}) {
   return { incidentId, patternId, skillName };
 }
 
-function buildTurnReviewTitle(raw, source) {
-  return firstString(
-    raw?.title,
-    raw?.summary?.title,
-    raw?.promptPreview,
-    raw?.prompt,
-    source.title,
-    source.sourceId,
-    '项目经验草案',
-  ) ?? '项目经验草案';
+const LOW_SIGNAL_TITLE_PATTERN = /^(只回复|回复|继续|可以|好的|没问题|嗯|哦|行|是|对|确认|同意|执行|开始|ok|okay|yes|done|go)([\s，。,.!！?？]|$)/i;
+
+function titleLooksLikeRawInstruction(text) {
+  const value = String(text ?? '').trim();
+  if (!value) return true;
+  if (value.length < 8) return true;
+  return LOW_SIGNAL_TITLE_PATTERN.test(value);
+}
+
+function describeTouchedFilesTitle(touchedFiles) {
+  const files = [...new Set((touchedFiles ?? []).map((file) => String(file ?? '').trim()).filter(Boolean))];
+  if (files.length === 0) return null;
+  const primary = files[0].split('/').filter(Boolean).at(-1);
+  return files.length > 1
+    ? `围绕 ${primary} 等 ${files.length} 个文件的实现经验`
+    : `围绕 ${primary} 的实现经验`;
+}
+
+function buildTurnReviewTitle(raw, source, touchedFiles = []) {
+  const structured = firstString(raw?.title, raw?.summary?.title, source.title);
+  if (structured && !titleLooksLikeRawInstruction(structured)) return structured;
+  const rootCause = source.rootCauseCandidates?.[0]?.title;
+  if (rootCause && !titleLooksLikeRawInstruction(rootCause)) return rootCause;
+  const prompt = firstString(raw?.promptPreview, raw?.prompt);
+  if (prompt && !titleLooksLikeRawInstruction(prompt)) return prompt;
+  return describeTouchedFilesTitle(touchedFiles)
+    ?? firstString(structured, source.sourceId, '项目经验草案')
+    ?? '项目经验草案';
+}
+
+function knowledgeCandidateFingerprint(categories = [], touchedFiles = []) {
+  const normalizedCategories = [...new Set((categories ?? []).map((item) => String(item ?? '').trim()).filter(Boolean))].sort();
+  const normalizedFiles = [...new Set((touchedFiles ?? []).map((item) => String(item ?? '').trim()).filter(Boolean))].sort();
+  return crypto.createHash('sha256').update(JSON.stringify([normalizedCategories, normalizedFiles])).digest('hex').slice(0, 16);
+}
+
+async function findPendingCandidateByFingerprint(projectRoot, fingerprint, excludeId) {
+  const index = await readKnowledgeIndex(projectRoot);
+  for (const entry of index.candidates ?? []) {
+    if (!entry?.candidateId || entry.candidateId === excludeId) continue;
+    const candidate = await readCandidateById(projectRoot, entry.candidateId);
+    if (!candidate || !isPendingKnowledgeCandidateStatus(normalizeCandidateStatus(candidate.status))) continue;
+    const existingFingerprint = candidate.fingerprint
+      ?? knowledgeCandidateFingerprint(candidate.categories, candidate.touchedFiles);
+    if (existingFingerprint === fingerprint) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 async function loadRawReviewInput(projectRoot, from) {
@@ -1432,11 +1472,16 @@ export async function reviewKnowledgeWorkspace(projectRoot, options = {}) {
     };
   }
 
-  const title = buildTurnReviewTitle(raw, source);
+  const title = buildTurnReviewTitle(raw, source, substantiveTouchedFiles);
   const rawCandidateRef = firstString(raw.knowledgeCandidateId, raw.id);
-  const candidateId = rawCandidateRef
+  let candidateId = rawCandidateRef
     ? (rawCandidateRef.startsWith('candidate-') ? rawCandidateRef : `candidate-${slugify(rawCandidateRef, 'knowledge')}`)
     : `candidate-${slugify(source.sourceId ?? title, 'knowledge')}`;
+  const fingerprint = knowledgeCandidateFingerprint(categories, substantiveTouchedFiles);
+  const duplicateCandidate = await findPendingCandidateByFingerprint(projectRoot, fingerprint, candidateId);
+  if (duplicateCandidate?.candidateId) {
+    candidateId = duplicateCandidate.candidateId;
+  }
   const promotedSource = { ...source, sourceId: candidateId };
   const names = deriveKnowledgeNames(promotedSource, { stablePattern: false });
   const candidateDir = knowledgePath(projectRoot, cjoin(KNOWLEDGE_CANDIDATES_DIR, candidateId));
@@ -1482,6 +1527,8 @@ export async function reviewKnowledgeWorkspace(projectRoot, options = {}) {
   const candidate = {
     ...draftCandidate,
     abstraction,
+    fingerprint,
+    occurrences: (readJsonObject(existingCandidate)?.occurrences ?? 0) + 1,
   };
   const userFacingExperience = buildKnowledgeUserFacingExperience({
     candidate,

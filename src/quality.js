@@ -115,6 +115,13 @@ const EVIDENCE_TOKENS = {
   growth: ['growth ledger', 'completion checkpoint', 'openprd grow', 'workflow-gotcha', 'code-extension', '自我成长', '账本', '候选'],
 };
 
+const DIAGNOSTIC_SURFACE_LABELS = {
+  'runtime-events': '运行事件记录',
+  timeline: '问题时间线',
+  'root-cause-candidates': '根因排查线索',
+  'diagnostic-report': '诊断报告',
+};
+
 function qualityPath(projectRoot, relativePath) {
   return cjoin(projectRoot, relativePath);
 }
@@ -606,18 +613,21 @@ function buildEvidenceLedger({ evidenceFiles, activeTasks, observability, busine
     };
   }
   if (observability.status === 'pass') {
-    const observabilitySignals = [
-      ...observability.centralizedTools,
-      ...(observability.diagnosticSurfaces ?? []),
-    ];
+    const toolCount = observability.centralizedTools.length;
+    const surfaceLabels = (observability.diagnosticSurfaces ?? [])
+      .map((surface) => DIAGNOSTIC_SURFACE_LABELS[surface] ?? surface);
+    const signalSummary = [
+      toolCount > 0 ? `${toolCount} 类日志或追踪工具` : '',
+      surfaceLabels.length > 0 ? `${surfaceLabels.length} 类诊断记录` : '',
+    ].filter(Boolean).join('和');
     ledger.traceability = {
       ...ledger.traceability,
       present: true,
       sources: [
         ...ledger.traceability.sources,
-        { path: 'project-observability-signals', source: observabilitySignals.join(', ') || 'observability' },
+        { path: '项目内的日志与追踪配置', source: signalSummary ? `检测到${signalSummary}` : '日志追踪检查' },
       ].slice(0, 12),
-      summary: `检测到 ${observability.correlationFields.length} 个链路关联字段${observability.diagnosticSurfaces?.length ? `；诊断面: ${observability.diagnosticSurfaces.join(', ')}` : ''}`,
+      summary: `出问题时可以追查：检测到 ${observability.correlationFields.length} 个追踪线索${surfaceLabels.length > 0 ? `，并留有${surfaceLabels.join('、')}` : ''}`,
     };
   }
   if (!businessGuardrails.riskDetected || businessGuardrails.status === 'pass') {
@@ -641,8 +651,8 @@ function buildEvidenceLedger({ evidenceFiles, activeTasks, observability, busine
         ...knowledge.candidates.slice(0, 3).map((candidate) => ({ path: candidate, source: 'openprd-knowledge-candidate' })),
       ].slice(0, 12),
       summary: knowledge.candidates.length > 0
-        ? `已有 ${knowledge.skills.length} 个项目经验 Skill，命中 ${knowledge.adoption?.totals?.hit ?? 0} / 引用 ${knowledge.adoption?.totals?.referenced ?? 0} / 注入 ${knowledge.adoption?.totals?.injected ?? 0}，另有 ${knowledge.candidates.length} 个待确认 candidate`
-        : `已有 ${knowledge.skills.length} 个项目经验 Skill，命中 ${knowledge.adoption?.totals?.hit ?? 0} / 引用 ${knowledge.adoption?.totals?.referenced ?? 0} / 注入 ${knowledge.adoption?.totals?.injected ?? 0}`,
+        ? `已沉淀 ${knowledge.skills.length} 条项目经验，近期被实际复用 ${knowledge.adoption?.totals?.referenced ?? 0} 次，另有 ${knowledge.candidates.length} 条经验草案等确认`
+        : `已沉淀 ${knowledge.skills.length} 条项目经验，近期被实际复用 ${knowledge.adoption?.totals?.referenced ?? 0} 次`,
     };
   } else if (knowledge.candidates.length > 0) {
     ledger.knowledge = {
@@ -652,7 +662,7 @@ function buildEvidenceLedger({ evidenceFiles, activeTasks, observability, busine
         ...ledger.knowledge.sources,
         ...knowledge.candidates.slice(0, 6).map((candidate) => ({ path: candidate, source: 'openprd-knowledge-candidate' })),
       ].slice(0, 12),
-      summary: `已有 ${knowledge.candidates.length} 个待确认 knowledge candidate`,
+      summary: `已有 ${knowledge.candidates.length} 条经验草案等确认，确认后会成为可复用的项目经验`,
     };
   }
   if (growth?.summary) {
@@ -666,7 +676,7 @@ function buildEvidenceLedger({ evidenceFiles, activeTasks, observability, busine
           ...ledger.growth.sources,
           { path: growth.ledgerPath ?? OPENPRD_GROWTH_LEDGER, source: 'openprd-growth-ledger' },
         ].slice(0, 12),
-        summary: `growth 账本已有 ${growth.summary.eventCount ?? 0} 条事件，其中 completion checkpoint ${completionCheckpoints} 条`,
+        summary: `成长记录已有 ${growth.summary.eventCount ?? 0} 条，其中收尾检查记录 ${completionCheckpoints} 条`,
       };
     }
   }

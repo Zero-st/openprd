@@ -63,11 +63,26 @@ const REVIEW_PRESENTATION_RELEVANT_OVERRIDE_KEYS = new Set([
   'stakeholders',
   'community',
   'seedUsers',
+  'communityFit',
   'currentAlternative',
+  'painEvidence',
   'manualPath',
+  'manualPlaybook',
   'commitmentSignals',
   'firstValidationStep',
   'defaultAlivePlan',
+  'paymentProof',
+  'mvpSlice',
+  'weekendTest',
+  'smallestExecution',
+  'productizeGate',
+  'firstCustomerPath',
+  'pricingHypothesis',
+  'customerOneProfitability',
+  'growthDiscipline',
+  'reversibility',
+  'customerTruth',
+  'valuesFit',
   'goals',
   'successMetrics',
   'acceptanceGoals',
@@ -123,11 +138,26 @@ const SYNTHESIZE_CONTENT_OVERRIDE_KEYS = new Set([
   'stakeholders',
   'community',
   'seedUsers',
+  'communityFit',
   'currentAlternative',
+  'painEvidence',
   'manualPath',
+  'manualPlaybook',
   'commitmentSignals',
   'firstValidationStep',
   'defaultAlivePlan',
+  'paymentProof',
+  'mvpSlice',
+  'weekendTest',
+  'smallestExecution',
+  'productizeGate',
+  'firstCustomerPath',
+  'pricingHypothesis',
+  'customerOneProfitability',
+  'growthDiscipline',
+  'reversibility',
+  'customerTruth',
+  'valuesFit',
   'goals',
   'successMetrics',
   'acceptanceGoals',
@@ -242,13 +272,18 @@ function gateHasClarificationConfirmation(gate) {
   return Boolean(gate?.clarificationConfirmedAt || gate?.status === 'clarification-confirmed');
 }
 
-function latestConfirmedClarificationCaptureTimestamp(currentState) {
+function latestUserConfirmedCaptureTimestamp(currentState, paths = null) {
   const timestamps = Object.entries(currentState?.captureMeta ?? {})
-    .filter(([field, entry]) => USER_CLARIFICATION_PATHS.has(field) && entry?.source === 'user-confirmed')
+    .filter(([field, entry]) => (!paths || paths.has(field)) && entry?.source === 'user-confirmed')
     .map(([, entry]) => entry?.capturedAt)
     .filter(Boolean)
     .map(String);
   return timestamps.length > 0 ? timestamps.sort().at(-1) : null;
+}
+
+function latestConfirmedClarificationCaptureTimestamp(currentState) {
+  return latestUserConfirmedCaptureTimestamp(currentState, USER_CLARIFICATION_PATHS)
+    || latestUserConfirmedCaptureTimestamp(currentState);
 }
 
 function hasDerivedClarificationCaptureSince(currentState, gateAt) {
@@ -616,13 +651,28 @@ function collectProjectRiskProbes(gate, snapshot) {
 function buildValidationFraming(sections = {}) {
   const validation = sections.validation ?? {};
   return {
-    community: shortList(validation.community, '需要先确认第一批最容易触达的社区、渠道或人群。'),
-    seedUsers: shortList(validation.seedUsers, '需要先确认第一批具体先找谁聊、先服务谁。'),
+    community: shortList(validation.community, '需要先确认第一批最容易触达的 1 到 3 个社区、渠道或人群。'),
+    seedUsers: shortList(validation.seedUsers, '需要先确认至少 3 到 10 个具体先找谁聊、先服务谁。'),
+    communityFit: shortList(validation.communityFit, '需要先确认你为什么算这个社区里的自己人、他们在哪里聚集、为什么现在就能触达。'),
     currentAlternative: shortList(validation.currentAlternative, '需要先确认他们现在主要靠什么替代方案在解决。'),
+    painEvidence: shortList(validation.painEvidence, '需要先确认这个问题到底有多痛、用户是否已经在为更差的办法花时间或花钱。'),
     manualPath: shortList(validation.manualPath, '需要先确认不做完整产品时先怎么手工交付价值。'),
+    manualPlaybook: shortList(validation.manualPlaybook, '需要先确认手工交付的触发条件、步骤、工具、耗时和交接点。'),
     commitmentSignals: shortList(validation.commitmentSignals, '需要先确认什么真实承诺能证明不是口头兴趣。'),
     firstValidationStep: shortList(validation.firstValidationStep, '需要先确认最低成本先做哪一步验证。'),
     defaultAlivePlan: shortList(validation.defaultAlivePlan, '需要先确认验证阶段怎样先活下来。'),
+    paymentProof: shortList(validation.paymentProof, '需要先确认有没有 10 个潜在用户样本、3/10 付费意愿或更强交易信号。'),
+    mvpSlice: shortList(validation.mvpSlice, '需要先确认第一版到底只做哪一件事。'),
+    weekendTest: shortList(validation.weekendTest, '需要先确认能不能压成周末级 MVP 或更轻的试跑。'),
+    smallestExecution: shortList(validation.smallestExecution, '需要先确认能否先用 spreadsheet、表单或 no-code 工具把价值跑出来。'),
+    productizeGate: shortList(validation.productizeGate, '需要先确认达到什么条件才允许继续产品化或加功能。'),
+    firstCustomerPath: shortList(validation.firstCustomerPath, '需要先确认第一批客户最现实的触达顺序。'),
+    pricingHypothesis: shortList(validation.pricingHypothesis, '需要先确认从第一个客户开始准备怎么收费。'),
+    customerOneProfitability: shortList(validation.customerOneProfitability, '需要先确认第一个客户如何覆盖时间和交付成本。'),
+    growthDiscipline: shortList(validation.growthDiscipline, '需要先确认销售、launch 和增长阶段准备守哪些纪律。'),
+    reversibility: shortList(validation.reversibility, '需要先确认验证结果一般时这条路是否容易回退，是否会逼出重招聘、长期绑定或重平台化。'),
+    customerTruth: shortList(validation.customerTruth, '需要先确认这更像在解决客户真问题还是满足内部冲动。'),
+    valuesFit: shortList(validation.valuesFit, '需要先确认这条路是否符合团队想坚持的价值观，以及它是不是你愿意长期住进去的业务形态。'),
   };
 }
 
@@ -642,6 +692,21 @@ function hasSatisfiedConfirmedClarificationWriteback({ gate, currentState, analy
     return false;
   }
   return !hasDerivedClarificationCaptureSince(currentState, gateAt);
+}
+
+function hasSatisfiedFreshRequirementWriteback({ gate, currentState, analysis, hasProductType }) {
+  if (!gate || gateHasClarificationConfirmation(gate)) {
+    return false;
+  }
+  if (!hasProductType || Number(analysis?.missingRequiredFields ?? 0) > 0) {
+    return false;
+  }
+  const gateAt = requirementGateReferenceTimestamp(gate);
+  if (!gateAt) {
+    return false;
+  }
+  const capturedAt = latestCaptureTimestamp(currentState);
+  return Boolean(capturedAt && String(capturedAt) >= String(gateAt));
 }
 
 function buildProjectFraming({ gate, snapshot, scenario, productType }) {
@@ -973,11 +1038,26 @@ function buildInlineClarification({ clarification, reflection, presentation }) {
     `- 这轮先不碰：${projectFraming.nonGoals ?? '待确认'}。`,
     `- 必须守住：${projectFraming.guardrails ?? '待确认'}。`,
     `- 第一批最容易触达：${validationFraming.community ?? '待确认'}。`,
+    `- 社区契合与触达依据：${validationFraming.communityFit ?? '待确认'}。`,
     `- 当前主要替代：${validationFraming.currentAlternative ?? '待确认'}。`,
+    `- 痛点与替代证据：${validationFraming.painEvidence ?? '待确认'}。`,
     `- 先怎么手工交付：${validationFraming.manualPath ?? '待确认'}。`,
+    `- 手工作战卡：${validationFraming.manualPlaybook ?? '待确认'}。`,
     `- 什么承诺才算真需求：${validationFraming.commitmentSignals ?? '待确认'}。`,
     `- 最低成本先验证：${validationFraming.firstValidationStep ?? '待确认'}。`,
     `- 怎么先活下来：${validationFraming.defaultAlivePlan ?? '待确认'}。`,
+    `- 付费验证信号：${validationFraming.paymentProof ?? '待确认'}。`,
+    `- 第一版只做一件事：${validationFraming.mvpSlice ?? '待确认'}。`,
+    `- 周末级验证长什么样：${validationFraming.weekendTest ?? '待确认'}。`,
+    `- 最小工具桥接：${validationFraming.smallestExecution ?? '待确认'}。`,
+    `- 产品化门槛：${validationFraming.productizeGate ?? '待确认'}。`,
+    `- 第一批客户路径：${validationFraming.firstCustomerPath ?? '待确认'}。`,
+    `- 初始收费假设：${validationFraming.pricingHypothesis ?? '待确认'}。`,
+    `- 客户 1 盈利路径：${validationFraming.customerOneProfitability ?? '待确认'}。`,
+    `- 销售与增长纪律：${validationFraming.growthDiscipline ?? '待确认'}。`,
+    `- 结果一般是否容易回退：${validationFraming.reversibility ?? '待确认'}。`,
+    `- 更像客户真问题还是自嗨：${validationFraming.customerTruth ?? '待确认'}。`,
+    `- 是否符合团队价值观：${validationFraming.valuesFit ?? '待确认'}。`,
   ];
   if (projectFraming.architectureSignals) {
     lines.push(`- 这次更可能会影响：${projectFraming.architectureSignals}。`);
@@ -1101,7 +1181,17 @@ async function buildRequirementIntakeReflection({ projectRoot, ws, snapshot, ana
   const validationLoopQuestion = reflectionQuestion(
     'validation-loop',
     '验证与创业闭环',
-    '请确认第一批最容易触达的社区或用户是谁、他们现在靠什么替代、如果先不做完整产品怎么手工交付、什么真实承诺最能证明值得继续，以及最低成本验证和先活下来底线是什么。'
+    '请确认第一批最容易触达的社区或用户是谁、你为什么算这个社区里的自己人、他们现在靠什么替代、问题到底有多痛、如果先不做完整产品怎么手工交付、手工作战卡怎么写、什么真实承诺最能证明值得继续，以及最低成本验证和先活下来底线是什么。'
+  );
+  const mvpAndSalesQuestion = reflectionQuestion(
+    'mvp-sales',
+    '最小 MVP 与首批成交',
+    '请确认第一版到底只做哪一件事、能不能压成周末级 MVP 或更轻试跑、能不能先用 spreadsheet 或 no-code 工具跑起来、第一批客户最现实的触达顺序是什么，以及从第一个客户开始准备怎么收费、有没有 10 个潜在用户样本和更强付费信号、达到什么条件才允许产品化。'
+  );
+  const minimalistReviewQuestion = reflectionQuestion(
+    'minimalist-review',
+    '可逆性 / 客户真问题 / 价值观',
+    '请确认如果验证结果一般，这条路有多可逆，是否会逼出重招聘、长期绑定或重平台化；这更像在解决客户真问题还是满足内部技术冲动；以及它是否符合团队现在想坚持的价值观、是不是你愿意长期住进去的业务形态。'
   );
   const needsDeliveryShapeQuestion = !needsInterfaceSketch
     && (
@@ -1113,6 +1203,8 @@ async function buildRequirementIntakeReflection({ projectRoot, ws, snapshot, ana
         reflectionQuestion('intent', '意图与目标', '请确认我理解得对不对：这次主要是谁在什么场景下遇到什么问题，第一版最想先改善什么结果？'),
         lensQuestion,
         validationLoopQuestion,
+        mvpAndSalesQuestion,
+        minimalistReviewQuestion,
         reflectionQuestion('project-context', '项目影响范围', '结合当前项目，请确认第一版最小可用切片是什么；哪些已有模块、入口、流程或历史需求必须复用，哪些可以调整？'),
         reflectionQuestion('scope-quality', '范围与验收', '请确认这次先做到哪一步就算有价值；哪些这轮先不动；哪些老用户习惯、现有业务结果或交付节奏不能被影响？'),
         needsInterfaceSketch
@@ -1165,7 +1257,8 @@ async function buildRequirementIntakeReflection({ projectRoot, ws, snapshot, ana
           `当前产品：${productName}；当前产品场景：${formatProductTypeDisplay(productType, { fallback: '待确认' })}；已记录问题：${currentProblem}`,
           `当前范围线索：${currentScope}`,
           `首轮画像：用户群体=${projectFraming.audience}；产品形态=${projectFraming.productShape}；第一版先做=${projectFraming.firstSlice}`,
-          `验证闭环：可触达人群=${projectFraming.validationFraming?.community}；当前替代=${projectFraming.validationFraming?.currentAlternative}；手工路径=${projectFraming.validationFraming?.manualPath}`,
+          `验证闭环：可触达人群=${projectFraming.validationFraming?.community}；社区契合=${projectFraming.validationFraming?.communityFit}；当前替代=${projectFraming.validationFraming?.currentAlternative}；痛点证据=${projectFraming.validationFraming?.painEvidence}；手工作战卡=${projectFraming.validationFraming?.manualPlaybook}`,
+          `最小成交链：一件事 MVP=${projectFraming.validationFraming?.mvpSlice}；周末级验证=${projectFraming.validationFraming?.weekendTest}；最小工具桥接=${projectFraming.validationFraming?.smallestExecution}；产品化门槛=${projectFraming.validationFraming?.productizeGate}`,
           activeChange ? `仍有 active change：${activeChange.activeChange}（${activeChange.status}），需要和本轮需求分开评估。` : '当前没有检测到 active change 冲突。',
         ],
       },
@@ -1175,7 +1268,8 @@ async function buildRequirementIntakeReflection({ projectRoot, ws, snapshot, ana
         findings: [
           `仍需确认的信息：${shortList(missing, '暂无明显缺口')}`,
           `边界与约束：先不做=${projectFraming.nonGoals}；不能破坏=${projectFraming.guardrails}`,
-          `商业验证：承诺信号=${projectFraming.validationFraming?.commitmentSignals}；低成本验证=${projectFraming.validationFraming?.firstValidationStep}；先活下来=${projectFraming.validationFraming?.defaultAlivePlan}`,
+          `商业验证：承诺信号=${projectFraming.validationFraming?.commitmentSignals}；低成本验证=${projectFraming.validationFraming?.firstValidationStep}；先活下来=${projectFraming.validationFraming?.defaultAlivePlan}；付费验证=${projectFraming.validationFraming?.paymentProof}；初始收费=${projectFraming.validationFraming?.pricingHypothesis}；客户 1 盈利=${projectFraming.validationFraming?.customerOneProfitability}；增长纪律=${projectFraming.validationFraming?.growthDiscipline}`,
+          `极简判断：最小工具桥接=${projectFraming.validationFraming?.smallestExecution}；产品化门槛=${projectFraming.validationFraming?.productizeGate}；可逆性=${projectFraming.validationFraming?.reversibility}；客户真问题=${projectFraming.validationFraming?.customerTruth}；价值观一致性=${projectFraming.validationFraming?.valuesFit}`,
           needsInterfaceSketch ? '需求看起来涉及界面或流程，需要先给用户确认草图或关键操作路径。' : `影响环节：${projectFraming.architectureSignals}`,
           `业务提醒：${projectFraming.riskProbeSummary}`,
           '进入实现前必须保留范围、非目标、异常路径和验收证据。',
@@ -1215,11 +1309,26 @@ function renderRequirementIntakeReflection(reflection) {
     `| 暂不处理 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.nonGoals ?? '待补充')} |`,
     `| 不能破坏 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.guardrails ?? '待补充')} |`,
     `| 可触达人群 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.community ?? '待补充')} |`,
+    `| 社区契合与触达依据 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.communityFit ?? '待补充')} |`,
     `| 当前替代 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.currentAlternative ?? '待补充')} |`,
+    `| 痛点与替代证据 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.painEvidence ?? '待补充')} |`,
     `| 手工路径 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.manualPath ?? '待补充')} |`,
+    `| 手工作战卡 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.manualPlaybook ?? '待补充')} |`,
     `| 承诺信号 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.commitmentSignals ?? '待补充')} |`,
     `| 最低成本验证 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.firstValidationStep ?? '待补充')} |`,
     `| 先活下来 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.defaultAlivePlan ?? '待补充')} |`,
+    `| 付费验证信号 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.paymentProof ?? '待补充')} |`,
+    `| 第一版只做一件事 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.mvpSlice ?? '待补充')} |`,
+    `| 周末级验证 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.weekendTest ?? '待补充')} |`,
+    `| 最小工具桥接 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.smallestExecution ?? '待补充')} |`,
+    `| 产品化门槛 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.productizeGate ?? '待补充')} |`,
+    `| 第一批客户路径 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.firstCustomerPath ?? '待补充')} |`,
+    `| 初始收费假设 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.pricingHypothesis ?? '待补充')} |`,
+    `| 客户 1 盈利路径 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.customerOneProfitability ?? '待补充')} |`,
+    `| 销售与增长纪律 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.growthDiscipline ?? '待补充')} |`,
+    `| 可逆性判断 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.reversibility ?? '待补充')} |`,
+    `| 客户真问题校验 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.customerTruth ?? '待补充')} |`,
+    `| 价值观一致性 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.validationFraming?.valuesFit ?? '待补充')} |`,
     `| 影响环节 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.architectureSignals ?? '待补充')} |`,
     `| 业务提醒 | ${escapeMarkdownTableCell(reflection.projectContext.projectFraming?.riskProbeSummary ?? '待补充')} |`,
     '',
@@ -1253,7 +1362,9 @@ function buildRequirementIntakeDepth(gate, reflection = null) {
   const fallbackLayers = [
     reflectionQuestion('product-context', '用户 / 产品形态 / 问题', '先确认：这是给谁用的、它更像个人产品 / 团队流程 / Agent 协作中的哪一种、为什么现在值得解决？'),
     reflectionQuestion('product-outcome', '第一版切片 / 目标 / 成功标准', '请确认第一版最小可用切片是什么；解决后用户先能完成什么，用什么业务结果或验收标准判断有效？'),
-    reflectionQuestion('product-validation', '验证闭环 / 承诺信号', '请确认第一批最容易触达的社区或用户是谁、他们现在靠什么替代、如果先不做完整产品怎么手工交付、什么真实承诺最能证明值得继续，以及最低成本验证和先活下来底线是什么。'),
+    reflectionQuestion('product-validation', '验证闭环 / 承诺信号', '请确认第一批最容易触达的社区或用户是谁、你为什么算这个社区里的自己人、他们现在靠什么替代、问题到底有多痛、如果先不做完整产品怎么手工交付、手工作战卡怎么写、什么真实承诺最能证明值得继续，以及最低成本验证和先活下来底线是什么。'),
+    reflectionQuestion('product-mvp-sales', '最小 MVP / 首批成交', '请确认第一版到底只做哪一件事、能不能压成周末级 MVP 或更轻试跑、第一批客户最现实的触达顺序是什么，以及从第一个客户开始准备怎么收费、怎么验证客户 1 也能打平时间和交付成本。'),
+    reflectionQuestion('product-minimalist-review', '可逆性 / 客户真问题 / 价值观', '请确认如果验证结果一般，这条路有多可逆；这更像在解决客户真问题还是满足内部技术冲动；以及它是否符合团队现在想坚持的价值观、是不是你愿意长期住进去的业务形态。'),
     reflectionQuestion('product-flow', '范围 / 非目标 / 异常路径', '请拆出本轮先做什么、不做什么、哪些既有行为不能被破坏，以及关键失败路径和恢复方式。'),
     reflectionQuestion(
       'product-detail',
@@ -2084,6 +2195,12 @@ async function computeWorkspaceGuidance(ws, options = {}) {
     analysis,
     hasProductType,
   });
+  const intakeSatisfiedByFreshWriteback = hasSatisfiedFreshRequirementWriteback({
+    gate: requirementGate,
+    currentState,
+    analysis,
+    hasProductType,
+  });
   const intakeReflection = await buildRequirementIntakeReflection({
     projectRoot: ws.projectRoot,
     ws,
@@ -2101,7 +2218,7 @@ async function computeWorkspaceGuidance(ws, options = {}) {
     prdReviewState,
     limit: Number(options.questionLimit ?? 5),
   }), requirementGate, intakeReflection, {
-    satisfied: intakeSatisfiedByReview || intakeSatisfiedByConfirmedWriteback,
+    satisfied: intakeSatisfiedByReview || intakeSatisfiedByConfirmedWriteback || intakeSatisfiedByFreshWriteback,
   });
 
   let nextAction = 'synthesize';

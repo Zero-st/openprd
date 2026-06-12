@@ -1,0 +1,11 @@
+[
+  {
+    "title": "Inspect scripts/openprd-codex-isolated-worker.mjs"
+  },
+  {
+    "title": "Inspect src/codex-hook-runner-template.mjs"
+  },
+  {
+    "title": "Inspect test/openprd.test.js"
+  }
+]

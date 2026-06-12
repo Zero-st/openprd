@@ -57,7 +57,7 @@ description: 为 OpenPrd 产品、CLI、Agent harness、AI code review / PR revi
 ## Source Map
 
 - OpenPrd / PRD 设计对标：`obra/superpowers`、`Fission-AI/OpenSpec`。
-- 创业验证 / 需求收口透镜：`slavingia/skills`。
+- 创业验证 / 需求收口透镜：`slavingia/skills`，重点吸收 community-first、10 specific people、current workaround as competition、Magic Piece of Paper、spreadsheet / no-code first、automate-one-step-at-a-time、forms and lists / CRUD first、build for today's customers not hypothetical future ones、avoid irreversible decisions、one-thing MVP、weekend test、3-of-10 payment proof、10+ paying before productize、first-customer circles、100 paying before launch、charge-from-day-one、customer-1 profitability、spend time before money、minimalist review 和 default alive，并优先按 `find-community -> validate-idea -> processize -> mvp -> first-customers -> pricing -> marketing-plan -> grow-sustainably -> company-values -> minimalist-review` 的时序来落地。
 - CLI 与 skill 体系对标：`larksuite/cli`、`anthropics/skills`、Claude Skills 官方文档、Claude Code Skills 官方文档。
 - 长程 Agent 任务：Anthropic long-running agents harness 工程文章。
 - 通用 harness：OpenAI harness engineering、LangChain agent harness anatomy。
@@ -81,6 +81,7 @@ description: 为 OpenPrd 产品、CLI、Agent harness、AI code review / PR revi
 ## 设计输出
 
 - 给出 OpenPrd 应该内置什么、生成什么、路由什么、保留什么门禁。
+- 如果来源本质上在讲 0 到 1 验证或创业判断，优先把“社区契合 -> 当前替代与痛点证据 -> 手工/表单/no-code 桥接 -> 付费验证 -> 单步自动化 / 最轻产品壳 -> 产品化门槛 -> 增长纪律”落到 requirement-intake、brainstorm、PRD 模板和 hook 提示里，而不是只加一条灵感备注。
 - 优先把结论落到 `CANONICAL_SKILLS`、repo-local skills、AGENTS/CLAUDE/Cursor 生成规则、hooks 或测试，而不是停留在口头建议。
 - 不把外部项目整包复制进 OpenPrd；只吸收可验证的路由、生成、门禁、状态承接和用户体验原则。
 - 需要显式说明时，简短写出参考了哪个来源、借鉴点、适用原因、不照搬边界，以及落到当前任务的具体决策。

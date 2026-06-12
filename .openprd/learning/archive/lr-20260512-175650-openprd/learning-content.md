@@ -48,7 +48,7 @@ evidenceManifestPath: /Users/chaojifeng/Projects/harness-engineer/openprd/.openp
 ```text
 输入: topic、genre、substyle、evidence summary。
 输出: 一个像书名的标题和一个短副题。
-要求: 标题可带“札记/小卷/归藏/心法”等书籍意象，但必须保留 topic 的核心名词。
+要求: 标题可带“札记/小卷/藏录/心法”等书籍意象，但必须保留 topic 的核心名词。
 ```
 
 ### Outline Prompt
@@ -87,7 +87,7 @@ evidenceManifestPath: /Users/chaojifeng/Projects/harness-engineer/openprd/.openp
   reader.html
 ```
 
-## 筑基 · 以验为基，收束归藏
+## 筑基 · 以验为基，收束藏录
 
 先定任务完成之基，把可验证的路径收束成学习书的地脉。
 

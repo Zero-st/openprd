@@ -276,3 +276,22 @@
 - 产品类型: agent。
 - 模板包: agent。
 - Digest: 7f0e2d2730982a2ae96647d2377f6204e54f8adadf1b18b05f4bc7167046c575.
+
+## 2026-06-07 13:06:02
+
+- Captured clarification for meta.productType, meta.title, meta.owner, problem.problemStatement, problem.whyNow, problem.evidence, users.primaryUsers, users.stakeholders, goals.goals, goals.successMetrics, goals.acceptanceGoals, scope.inScope, scope.outOfScope, scenarios.primaryFlows, scenarios.edgeCases, scenarios.failureModes, requirements.functional, requirements.nonFunctional, requirements.businessRules, constraints.technical, constraints.dependencies, constraints.compliance, risks.assumptions, risks.risks, risks.openQuestions, typeSpecific.fields.humanAgentContract, typeSpecific.fields.autonomyBoundary, typeSpecific.fields.toolBoundary, typeSpecific.fields.stateModel, typeSpecific.fields.evalPlan, handoff.owner, handoff.nextStep, handoff.targetSystem, businessGuardrails.costDrivers, businessGuardrails.usageLimits, businessGuardrails.abusePrevention, businessGuardrails.monitoringSignals, businessGuardrails.alertThresholds, businessGuardrails.stopLossActions.
+
+## 2026-06-07 13:06:56
+
+- Captured clarification for businessGuardrails.costDrivers, businessGuardrails.monitoringSignals, businessGuardrails.alertThresholds.
+
+## 2026-06-07 13:07:07
+
+- 已整理出一版可确认的需求稿。
+- 产品场景: 以 Agent 为主要使用场景。
+- 场景模板: 以 Agent 为主要使用场景。
+
+## 2026-06-07 13:08:25
+
+- 已为 OpenPrd loop 隔离 worktree 提交闭环 创建 architecture 图表评审产物。
+- 请在需求定稿前使用该产物确认组件、边界和缺失系统。

@@ -35,7 +35,7 @@
     "titlePatterns": [
       "《{topic}》修行札记",
       "《{topic}》证道小卷",
-      "《{topic}》归藏篇"
+      "《{topic}》藏录篇"
     ],
     "outlineArc": [
       "筑基立卷",
@@ -50,7 +50,7 @@
       "法门",
       "玉简",
       "破境",
-      "归藏",
+      "藏录",
       "心法",
       "炉火"
     ],
@@ -62,7 +62,7 @@
     ],
     "prompts": {
       "system": "你是 OpenPrd 复盘学习书的风格迁移 Agent。\n你的任务不是虚构故事，而是把中性的学习内容转写成仙侠修行札记。\n事实层必须完全来自 learning-content 和 evidence-manifest；风格层只能改变表达、结构节奏和意象。",
-      "title": "输入: topic、genre、substyle、evidence summary。\n输出: 一个像书名的标题和一个短副题。\n要求: 标题可带“札记/小卷/归藏/心法”等书籍意象，但必须保留 topic 的核心名词。",
+      "title": "输入: topic、genre、substyle、evidence summary。\n输出: 一个像书名的标题和一个短副题。\n要求: 标题可带“札记/小卷/藏录/心法”等书籍意象，但必须保留 topic 的核心名词。",
       "outline": "输入: 章节目标、证据类别、读者学习路径。\n输出: 最多三层目录。\n第 1 层是卷/章，第 2 层是本章心法、检索练习、工作示例、证据锚点，第 3 层是具体问题或示例。",
       "chapter": "输入: semanticTitle、summary、paragraphs、retrievalBlocks、workedExamples。\n输出: 保持同一事实顺序的风格化章节。\n要求: 每章先用修行意象开场，再把意象落回文件、状态、验证或任务路径。",
       "proseRewrite": "把“做了什么/为什么/如何验证”改写成“立基/观脉/破境/传功/归元”的阅读路径。\n每段至少保留一个明确事实锚点，例如 `.openprd/`、docs/basic、loop finish、reader.html、evidence manifest。\n不要改写文件名、命令名、schema、packageId 和 source id。",
@@ -132,7 +132,7 @@
       "id": "chapter-1",
       "depth": 1,
       "title": "第 1 章 · 筑基",
-      "subtitle": "以验为基，收束归藏",
+      "subtitle": "以验为基，收束藏录",
       "children": [
         {
           "id": "chapter-1-reading",
@@ -395,7 +395,7 @@
     {
       "id": "chapter-1",
       "label": "筑基",
-      "semanticTitle": "以验为基，收束归藏",
+      "semanticTitle": "以验为基，收束藏录",
       "summary": "先定任务完成之基，把可验证的路径收束成学习书的地脉。",
       "paragraphs": [
         "此处先立灵根，再回看证据脉络。 这一章先把《OpenPrd 复盘学习模式》的任务完成事实固定下来。长程任务结束时，真正值得保留的不是“我感觉做完了”，而是“哪个任务、哪个验证、哪份报告、哪个路径都能再找到”。",

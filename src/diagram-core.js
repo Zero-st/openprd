@@ -88,17 +88,17 @@ function pickValue(primary, fallback) {
 
 function theme(type) {
   const themes = {
-    frontend: { fill: '#0f172a', stroke: '#22d3ee', title: '#67e8f9' },
-    backend: { fill: '#0f172a', stroke: '#34d399', title: '#6ee7b7' },
-    database: { fill: '#0f172a', stroke: '#c084fc', title: '#d8b4fe' },
-    cloud: { fill: '#0f172a', stroke: '#f59e0b', title: '#fcd34d' },
-    security: { fill: '#0f172a', stroke: '#fb7185', title: '#fda4af' },
-    external: { fill: '#0f172a', stroke: '#94a3b8', title: '#e2e8f0' },
-    user_action: { fill: '#0f172a', stroke: '#22d3ee', title: '#67e8f9' },
-    system_process: { fill: '#0f172a', stroke: '#34d399', title: '#6ee7b7' },
-    decision: { fill: '#0f172a', stroke: '#f59e0b', title: '#fcd34d' },
-    error_path: { fill: '#0f172a', stroke: '#fb7185', title: '#fda4af' },
-    success: { fill: '#0f172a', stroke: '#c084fc', title: '#d8b4fe' },
+    frontend: { fill: '#eff6ff', stroke: '#2563eb', title: '#1d4ed8' },
+    backend: { fill: '#f0fdfa', stroke: '#0f766e', title: '#0f766e' },
+    database: { fill: '#eef2ff', stroke: '#4f46e5', title: '#4338ca' },
+    cloud: { fill: '#fffbeb', stroke: '#b45309', title: '#b45309' },
+    security: { fill: '#fef2f2', stroke: '#dc2626', title: '#b91c1c' },
+    external: { fill: '#f8fafc', stroke: '#94a3b8', title: '#475569' },
+    user_action: { fill: '#eff6ff', stroke: '#2563eb', title: '#1d4ed8' },
+    system_process: { fill: '#f0fdfa', stroke: '#0f766e', title: '#0f766e' },
+    decision: { fill: '#fffbeb', stroke: '#b45309', title: '#b45309' },
+    error_path: { fill: '#fef2f2', stroke: '#dc2626', title: '#b91c1c' },
+    success: { fill: '#eef2ff', stroke: '#4f46e5', title: '#4338ca' },
   };
   return themes[type] ?? themes.external;
 }
@@ -245,36 +245,32 @@ function renderShell({ lang = 'zh-CN', title, subtitle, projectName, svgMarkup, 
     <title>${escapeHtml(title)}</title>
     <style>
       :root {
-        color-scheme: dark;
-        --bg: #020617;
-        --panel: rgba(15, 23, 42, 0.92);
-        --text: #e2e8f0;
-        --muted: #94a3b8;
-        --grid: rgba(148, 163, 184, 0.12);
+        color-scheme: light;
+        --bg: #f6f8fb;
+        --panel: #ffffff;
+        --panel-soft: #f9fafb;
+        --text: #172033;
+        --muted: #667085;
+        --line: #d8dee8;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        font-family: "JetBrains Mono", "SFMono-Regular", Menlo, monospace;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         color: var(--text);
-        background:
-          linear-gradient(var(--grid) 1px, transparent 1px),
-          linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-          radial-gradient(circle at top, rgba(34, 211, 238, 0.12), transparent 30%),
-          var(--bg);
-        background-size: 40px 40px, 40px 40px, 100% 100%, auto;
+        background: var(--bg);
       }
       .page { max-width: 1240px; margin: 0 auto; padding: 32px 24px 48px; }
       .header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
       .header-copy { display: flex; flex-direction: column; gap: 4px; }
       .pulse {
-        width: 12px; height: 12px; border-radius: 999px; background: #22d3ee;
-        box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.7); animation: pulse 2s infinite;
+        width: 12px; height: 12px; border-radius: 999px; background: #2563eb;
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.5); animation: pulse 2s infinite;
       }
       @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.7); }
-        70% { box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+        0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.5); }
+        70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
       }
       .project-chip {
         display: inline-flex;
@@ -283,32 +279,37 @@ function renderShell({ lang = 'zh-CN', title, subtitle, projectName, svgMarkup, 
         width: fit-content;
         padding: 4px 10px;
         border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.24);
-        background: rgba(15, 23, 42, 0.72);
-        color: #cbd5e1;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--muted);
         font-size: 11px;
       }
-      h1 { margin: 0; font-size: 28px; }
+      h1 { margin: 0; font-size: 28px; font-weight: 700; }
       .subtitle-block { margin: 6px 0 0 24px; color: var(--muted); font-size: 13px; }
       .diagram-shell {
-        margin-top: 24px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 20px;
-        padding: 20px; background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(6px);
+        margin-top: 24px; border: 1px solid var(--line); border-radius: 20px;
+        padding: 20px; background: var(--panel);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
       }
       svg { width: 100%; height: auto; display: block; }
       .node-title { font-size: 13px; font-weight: 700; }
-      .node-subtitle, .detail, .flow-label, .legend-label, .footer { font-size: 10px; fill: #cbd5e1; }
-      .detail { fill: #94a3b8; }
+      .node-subtitle, .detail, .flow-label, .legend-label, .footer { font-size: 10px; fill: #334155; }
+      .detail { fill: #667085; }
+      .lane-chip { font-size: 9px; fill: #94a3b8; }
+      .legend-label { fill: #667085; }
+      .flow-label { fill: #334155; paint-order: stroke; stroke: #ffffff; stroke-width: 4px; stroke-linejoin: round; }
       .summary-grid, .side-grid { display: grid; gap: 16px; margin-top: 24px; }
       .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .side-grid { grid-template-columns: 1fr 1fr; }
       .card {
-        border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 16px;
+        border: 1px solid var(--line); border-radius: 16px;
         background: var(--panel); padding: 14px 16px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
       }
-      .card-header { display: flex; align-items: center; gap: 10px; font-size: 12px; margin-bottom: 8px; }
+      .card-header { display: flex; align-items: center; gap: 10px; font-size: 12px; margin-bottom: 8px; font-weight: 600; }
       .dot { width: 10px; height: 10px; border-radius: 999px; }
-      ul { padding-left: 18px; margin: 0; color: #cbd5e1; font-size: 12px; line-height: 1.65; }
-      .footer { margin-top: 18px; color: var(--muted); }
+      ul { padding-left: 18px; margin: 0; color: #475467; font-size: 12px; line-height: 1.65; }
+      .footer { margin-top: 18px; color: var(--muted); font-size: 12px; }
     </style>
   </head>
   <body>
@@ -330,28 +331,273 @@ function renderShell({ lang = 'zh-CN', title, subtitle, projectName, svgMarkup, 
 </html>`;
 }
 
+function textUnits(text) {
+  let units = 0;
+  for (const ch of `${text ?? ''}`) {
+    units += /[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]/.test(ch) ? 2 : 1;
+  }
+  return units;
+}
+
+function wrapTextLines(text, maxUnits, maxLines = 3) {
+  const value = `${text ?? ''}`.trim().replace(/\s+/g, ' ');
+  if (!value) return [];
+  const lines = [];
+  let current = '';
+  let currentUnits = 0;
+  for (const ch of value) {
+    const chUnits = textUnits(ch);
+    if (currentUnits + chUnits > maxUnits && current) {
+      lines.push(current);
+      current = ch === ' ' ? '' : ch;
+      currentUnits = ch === ' ' ? 0 : chUnits;
+      if (lines.length === maxLines) break;
+    } else {
+      current += ch;
+      currentUnits += chUnits;
+    }
+  }
+  if (lines.length < maxLines && current) {
+    lines.push(current);
+  } else if (lines.length === maxLines && current) {
+    const last = lines[maxLines - 1];
+    lines[maxLines - 1] = `${last.slice(0, Math.max(0, last.length - 1))}…`;
+  }
+  return lines;
+}
+
+const FLOW_LAYOUT_DEFAULTS = {
+  boxWidth: 232,
+  gapX: 96,
+  gapY: 30,
+  marginX: 72,
+  marginY: 96,
+  titleHeight: 30,
+  lineHeight: 15,
+  subtitleMaxLines: 3,
+  detailMaxItems: 4,
+  bottomPadding: 14,
+};
+
+function assignLayers(nodes, edges) {
+  const ids = new Set(nodes.map((node) => node.id));
+  const validEdges = edges.filter((edge) => ids.has(edge.from) && ids.has(edge.to) && edge.from !== edge.to);
+  const layers = new Map(nodes.map((node) => [node.id, 0]));
+  const maxIterations = Math.max(4, nodes.length * nodes.length);
+  let changed = true;
+  let iterations = 0;
+  while (changed && iterations < maxIterations) {
+    changed = false;
+    iterations += 1;
+    for (const edge of validEdges) {
+      const required = layers.get(edge.from) + 1;
+      if (layers.get(edge.to) < required && required <= nodes.length) {
+        layers.set(edge.to, required);
+        changed = true;
+      }
+    }
+  }
+  return { layers, validEdges };
+}
+
+function layoutFlowDiagram(nodes, edges, options = {}) {
+  const config = { ...FLOW_LAYOUT_DEFAULTS, ...options };
+  const { layers, validEdges } = assignLayers(nodes, edges);
+
+  const positioned = new Map();
+  for (const node of nodes) {
+    const subtitle = `${node.subtitle ?? ''}`.trim() === '待补充' ? '' : node.subtitle;
+    const subtitleLines = wrapTextLines(subtitle, 34, config.subtitleMaxLines);
+    const detailLines = (node.details ?? []).slice(0, config.detailMaxItems)
+      .filter((line) => `${line ?? ''}`.trim() !== '待补充')
+      .map((line) => wrapTextLines(line, 34, 1)[0])
+      .filter(Boolean);
+    const height = config.titleHeight
+      + (subtitleLines.length * config.lineHeight)
+      + (detailLines.length > 0 ? 6 + detailLines.length * config.lineHeight : 0)
+      + config.bottomPadding;
+    positioned.set(node.id, {
+      node,
+      subtitleLines,
+      detailLines,
+      width: config.boxWidth,
+      height: Math.max(height, 64),
+      layer: layers.get(node.id) ?? 0,
+      x: 0,
+      y: 0,
+    });
+  }
+
+  const columns = new Map();
+  for (const entry of positioned.values()) {
+    if (!columns.has(entry.layer)) columns.set(entry.layer, []);
+    columns.get(entry.layer).push(entry);
+  }
+
+  const incoming = new Map();
+  for (const edge of validEdges) {
+    if (!incoming.has(edge.to)) incoming.set(edge.to, []);
+    incoming.get(edge.to).push(edge.from);
+  }
+
+  const layerKeys = [...columns.keys()].sort((a, b) => a - b);
+  let maxColumnHeight = 0;
+  for (const key of layerKeys) {
+    const column = columns.get(key);
+    column.sort((a, b) => {
+      const aPreds = incoming.get(a.node.id) ?? [];
+      const bPreds = incoming.get(b.node.id) ?? [];
+      const avg = (preds) => {
+        const ys = preds.map((id) => positioned.get(id)?.y ?? 0);
+        return ys.length > 0 ? ys.reduce((sum, y) => sum + y, 0) / ys.length : Number.MAX_SAFE_INTEGER;
+      };
+      const diff = avg(aPreds) - avg(bPreds);
+      if (diff !== 0) return diff;
+      return (a.node.type === 'error_path' ? 1 : 0) - (b.node.type === 'error_path' ? 1 : 0);
+    });
+    const columnHeight = column.reduce((sum, entry) => sum + entry.height, 0) + Math.max(0, column.length - 1) * config.gapY;
+    maxColumnHeight = Math.max(maxColumnHeight, columnHeight);
+  }
+
+  for (const [index, key] of layerKeys.entries()) {
+    const column = columns.get(key);
+    const columnHeight = column.reduce((sum, entry) => sum + entry.height, 0) + Math.max(0, column.length - 1) * config.gapY;
+    let cursorY = config.marginY + (maxColumnHeight - columnHeight) / 2;
+    for (const entry of column) {
+      entry.x = config.marginX + index * (config.boxWidth + config.gapX);
+      entry.y = cursorY;
+      cursorY += entry.height + config.gapY;
+    }
+  }
+
+  const width = config.marginX * 2 + layerKeys.length * config.boxWidth + Math.max(0, layerKeys.length - 1) * config.gapX;
+  const height = config.marginY + maxColumnHeight + 96;
+  return { positioned, validEdges, width: Math.max(width, 760), height: Math.max(height, 360), config };
+}
+
+function routeFlowEdge(source, target, index, laneOffset) {
+  if (target.layer > source.layer) {
+    const startX = source.x + source.width;
+    const startY = source.y + source.height / 2;
+    const endX = target.x;
+    const endY = target.y + target.height / 2;
+    const midX = (startX + endX) / 2;
+    return {
+      path: `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`,
+      labelX: midX,
+      labelY: (startY + endY) / 2 - 8 - laneOffset,
+    };
+  }
+  if (target.layer === source.layer) {
+    const downward = target.y > source.y;
+    const startX = source.x + source.width / 2;
+    const startY = downward ? source.y + source.height : source.y;
+    const endX = target.x + target.width / 2;
+    const endY = downward ? target.y : target.y + target.height;
+    const midY = (startY + endY) / 2;
+    return {
+      path: `M ${startX} ${startY} C ${startX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`,
+      labelX: (startX + endX) / 2 + 10,
+      labelY: midY - laneOffset,
+    };
+  }
+  const startX = source.x;
+  const startY = source.y + source.height / 2;
+  const endX = target.x + target.width;
+  const endY = target.y + target.height / 2;
+  const drop = Math.max(startY, endY) + 56 + index * 14;
+  return {
+    path: `M ${startX} ${startY} C ${startX - 60} ${drop}, ${endX + 60} ${drop}, ${endX} ${endY}`,
+    labelX: (startX + endX) / 2,
+    labelY: drop - 8,
+  };
+}
+
 function renderBox(node, layout) {
   const nodeTheme = theme(node.type);
-  const detailLines = (node.details ?? []).slice(0, 4);
-  const detailMarkup = detailLines.map((line, index) => (
-    `<text x="${layout.x + 16}" y="${layout.y + 54 + (index * 16)}" class="detail">${escapeHtml(trimText(line, 42))}</text>`
-  )).join('');
+  const subtitleLines = layout.subtitleLines ?? wrapTextLines(node.subtitle, 34, 3);
+  const detailLines = layout.detailLines
+    ?? (node.details ?? []).slice(0, 4).map((line) => wrapTextLines(line, 34, 1)[0]).filter(Boolean);
+  const lineHeight = 15;
+  let cursorY = layout.y + 24;
+  const titleMarkup = `<text x="${layout.x + 16}" y="${cursorY}" class="node-title" fill="${nodeTheme.title}">${escapeHtml(trimText(node.name, 30))}</text>`;
+  const laneMarkup = node.lane
+    ? `<text x="${layout.x + layout.width - 14}" y="${layout.y + 22}" class="lane-chip" text-anchor="end">${escapeHtml(trimText(node.lane, 12))}</text>`
+    : '';
+  cursorY += 18;
+  const subtitleMarkup = subtitleLines.map((line) => {
+    const markup = `<text x="${layout.x + 16}" y="${cursorY}" class="node-subtitle">${escapeHtml(line)}</text>`;
+    cursorY += lineHeight;
+    return markup;
+  }).join('');
+  if (detailLines.length > 0) cursorY += 6;
+  const detailMarkup = detailLines.map((line) => {
+    const markup = `<text x="${layout.x + 16}" y="${cursorY}" class="detail">${escapeHtml(line)}</text>`;
+    cursorY += lineHeight;
+    return markup;
+  }).join('');
 
   return `
     <g>
       <rect x="${layout.x}" y="${layout.y}" width="${layout.width}" height="${layout.height}" rx="14" fill="${nodeTheme.fill}" fill-opacity="0.92" stroke="${nodeTheme.stroke}" stroke-width="1.5"></rect>
-      <text x="${layout.x + 16}" y="${layout.y + 28}" class="node-title" fill="${nodeTheme.title}">${escapeHtml(node.name)}</text>
-      <text x="${layout.x + 16}" y="${layout.y + 44}" class="node-subtitle">${escapeHtml(trimText(node.subtitle, 48))}</text>
+      ${titleMarkup}
+      ${laneMarkup}
+      ${subtitleMarkup}
       ${detailMarkup}
     </g>
   `;
 }
 
 function renderArrow(def) {
-  const dashed = def.type === 'security' || def.type === 'error_path' ? 'stroke-dasharray="6,4"' : '';
-  const stroke = def.type === 'security' || def.type === 'error_path' ? '#fb7185' : '#7dd3fc';
-  return `<path d="${def.path}" fill="none" stroke="${stroke}" stroke-width="2" ${dashed} marker-end="url(#arrowhead)"></path>
-  <text x="${def.labelX}" y="${def.labelY}" class="flow-label">${escapeHtml(def.label)}</text>`;
+  const isError = def.type === 'security' || def.type === 'error_path';
+  const dashed = isError ? 'stroke-dasharray="6,4"' : '';
+  const stroke = isError ? '#dc2626' : '#64748b';
+  const marker = isError ? 'arrowhead-error' : 'arrowhead';
+  const label = trimText(def.label, 24);
+  const labelMarkup = label && label !== '待补充'
+    ? `<text x="${def.labelX}" y="${def.labelY}" class="flow-label" text-anchor="middle">${escapeHtml(label)}</text>`
+    : '';
+  return `<path d="${def.path}" fill="none" stroke="${stroke}" stroke-width="1.8" ${dashed} marker-end="url(#${marker})"></path>
+  ${labelMarkup}`;
+}
+
+const DIAGRAM_ARROW_DEFS = `
+      <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+          <polygon points="0 0, 10 5, 0 10" fill="#64748b"></polygon>
+        </marker>
+        <marker id="arrowhead-error" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+          <polygon points="0 0, 10 5, 0 10" fill="#dc2626"></polygon>
+        </marker>
+      </defs>`;
+
+function renderFlowEdges(layout) {
+  const labelSlots = new Map();
+  return layout.validEdges.map((edge, index) => {
+    const source = layout.positioned.get(edge.from);
+    const target = layout.positioned.get(edge.to);
+    if (!source || !target) return '';
+    const slotKey = `${source.layer}->${target.layer === source.layer ? `${edge.to}` : target.layer}`;
+    const slot = labelSlots.get(slotKey) ?? 0;
+    labelSlots.set(slotKey, slot + 1);
+    const routed = routeFlowEdge(source, target, index, slot * 16);
+    return renderArrow({ ...routed, label: edge.label, type: edge.type });
+  }).join('\n');
+}
+
+function renderLegend(entries, originY) {
+  let cursorX = 54;
+  const items = entries.map(({ color, label }) => {
+    const markup = `<rect x="${cursorX}" y="${originY + 14}" width="12" height="12" rx="3" fill="${color}"></rect><text x="${cursorX + 20}" y="${originY + 24}" class="legend-label">${escapeHtml(label)}</text>`;
+    cursorX += 20 + textUnits(label) * 7 + 36;
+    return markup;
+  }).join('');
+  return `
+      <g>
+        <text x="54" y="${originY}" class="legend-label">图例</text>
+        ${items}
+      </g>
+  `;
 }
 
 function resolveProductLayerTitle(productType) {
@@ -494,57 +740,59 @@ export function buildArchitectureDiagramModel(snapshot) {
 }
 
 export function renderArchitectureDiagramHtml(model) {
-  const layouts = {
-    users: { x: 390, y: 48, width: 300, height: 96 },
-    experience: { x: 70, y: 228, width: 290, height: 120 },
-    core: { x: 395, y: 228, width: 290, height: 120 },
-    delivery: { x: 720, y: 228, width: 290, height: 120 },
-    integrations: { x: 180, y: 448, width: 290, height: 120 },
-    governance: { x: 610, y: 448, width: 290, height: 120 },
-  };
-  const fallbackLayouts = [
-    { x: 390, y: 48, width: 300, height: 96 },
-    { x: 70, y: 228, width: 290, height: 120 },
-    { x: 395, y: 228, width: 290, height: 120 },
-    { x: 720, y: 228, width: 290, height: 120 },
-    { x: 180, y: 448, width: 290, height: 120 },
-    { x: 610, y: 448, width: 290, height: 120 },
-  ];
+  const components = Array.isArray(model.components) ? model.components : [];
+  const flows = Array.isArray(model.flows) ? model.flows : [];
+  const layout = layoutFlowDiagram(components, flows.map((flow) => ({
+    from: flow.source,
+    to: flow.target,
+    label: flow.label,
+    type: flow.type,
+  })), { boxWidth: 256 });
 
-  const arrows = [
-    { path: 'M 540 144 C 540 182, 215 176, 215 228', label: model.flows[0]?.label ?? '用户流程', labelX: 312, labelY: 176, type: model.flows[0]?.type ?? 'standard' },
-    { path: 'M 360 288 L 395 288', label: model.flows[1]?.label ?? '产品动作', labelX: 366, labelY: 276, type: model.flows[1]?.type ?? 'standard' },
-    { path: 'M 685 288 L 720 288', label: model.flows[4]?.label ?? '成功标准', labelX: 694, labelY: 276, type: model.flows[4]?.type ?? 'standard' },
-    { path: 'M 540 348 C 540 392, 325 396, 325 448', label: model.flows[2]?.label ?? '依赖', labelX: 300, labelY: 392, type: model.flows[2]?.type ?? 'standard' },
-    { path: 'M 540 348 C 540 392, 755 396, 755 448', label: model.flows[3]?.label ?? '约束', labelX: 692, labelY: 392, type: model.flows[3]?.type ?? 'security' },
-    { path: 'M 470 568 C 470 610, 820 610, 820 348', label: model.flows[5]?.label ?? '运营就绪', labelX: 596, labelY: 614, type: model.flows[5]?.type ?? 'standard' },
-    { path: 'M 820 568 C 920 612, 920 416, 865 348', label: model.flows[6]?.label ?? '评审确认', labelX: 850, labelY: 612, type: model.flows[6]?.type ?? 'security' },
-  ];
-
-  const componentMarkup = model.components
-    .map((component, index) => renderBox(component, layouts[component.id] ?? fallbackLayouts[index] ?? fallbackLayouts.at(-1)))
+  const componentMarkup = components
+    .map((component) => {
+      const entry = layout.positioned.get(component.id);
+      return entry ? renderBox(component, entry) : '';
+    })
     .join('\n');
-  const arrowMarkup = arrows.map(renderArrow).join('\n');
+  const edgeMarkup = renderFlowEdges(layout);
+
+  const internalEntries = components
+    .filter((component) => component.type !== 'external')
+    .map((component) => layout.positioned.get(component.id))
+    .filter(Boolean);
+  let boundaryMarkup = '';
+  let boundaryBottom = layout.height - 96;
+  if (internalEntries.length > 0) {
+    const minX = Math.min(...internalEntries.map((entry) => entry.x)) - 26;
+    const minY = Math.min(...internalEntries.map((entry) => entry.y)) - 34;
+    const maxX = Math.max(...internalEntries.map((entry) => entry.x + entry.width)) + 26;
+    const maxY = Math.max(...internalEntries.map((entry) => entry.y + entry.height)) + 26;
+    boundaryBottom = Math.max(boundaryBottom, maxY);
+    boundaryMarkup = `
+      <rect x="${minX}" y="${minY}" width="${maxX - minX}" height="${maxY - minY}" rx="18" fill="none" stroke="#b45309" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="8,5"></rect>
+      <text x="${minX + 18}" y="${minY + 22}" class="legend-label">方案边界</text>
+    `;
+  }
+
+  const legendY = boundaryBottom + 34;
+  const legendMarkup = renderLegend([
+    { color: '#2563eb', label: '体验' },
+    { color: '#0f766e', label: '核心逻辑' },
+    { color: '#4f46e5', label: '验证' },
+    { color: '#b45309', label: '依赖' },
+    { color: '#dc2626', label: '约束' },
+    { color: '#94a3b8', label: '外部/用户' },
+  ], legendY);
+
+  const svgHeight = legendY + 48;
   const svgMarkup = `
-    <svg viewBox="0 0 1080 720" role="img" aria-label="${escapeHtml(model.title)}">
-      <defs>
-        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-          <polygon points="0 0, 10 5, 0 10" fill="#7dd3fc"></polygon>
-        </marker>
-      </defs>
-      <rect x="40" y="172" width="1000" height="430" rx="18" fill="none" stroke="#f59e0b" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="8,5"></rect>
-      <text x="58" y="194" class="legend-label">方案边界</text>
-      ${arrowMarkup}
+    <svg viewBox="0 0 ${layout.width} ${svgHeight}" role="img" aria-label="${escapeHtml(model.title)}">
+      ${DIAGRAM_ARROW_DEFS}
+      ${boundaryMarkup}
+      ${edgeMarkup}
       ${componentMarkup}
-      <g>
-        <text x="54" y="652" class="legend-label">图例</text>
-        <rect x="54" y="666" width="12" height="12" rx="3" fill="#22d3ee"></rect><text x="74" y="676" class="legend-label">体验</text>
-        <rect x="182" y="666" width="12" height="12" rx="3" fill="#34d399"></rect><text x="202" y="676" class="legend-label">核心逻辑</text>
-        <rect x="330" y="666" width="12" height="12" rx="3" fill="#c084fc"></rect><text x="350" y="676" class="legend-label">验证</text>
-        <rect x="476" y="666" width="12" height="12" rx="3" fill="#f59e0b"></rect><text x="496" y="676" class="legend-label">依赖</text>
-        <rect x="640" y="666" width="12" height="12" rx="3" fill="#fb7185"></rect><text x="660" y="676" class="legend-label">约束</text>
-        <rect x="798" y="666" width="12" height="12" rx="3" fill="#94a3b8"></rect><text x="818" y="676" class="legend-label">外部/用户</text>
-      </g>
+      ${legendMarkup}
     </svg>
   `;
 
@@ -685,62 +933,47 @@ export function buildProductFlowDiagramModel(snapshot) {
 }
 
 export function renderProductFlowDiagramHtml(model) {
-  const layouts = {
-    entry: { x: 90, y: 250, width: 190, height: 112 },
-    experience: { x: 330, y: 250, width: 210, height: 112 },
-    decision: { x: 590, y: 245, width: 180, height: 122 },
-    success: { x: 820, y: 140, width: 180, height: 112 },
-    failure: { x: 820, y: 360, width: 180, height: 122 },
-  };
-  const fallbackLayouts = [
-    { x: 90, y: 250, width: 190, height: 112 },
-    { x: 330, y: 250, width: 210, height: 112 },
-    { x: 590, y: 245, width: 180, height: 122 },
-    { x: 820, y: 140, width: 180, height: 112 },
-    { x: 820, y: 360, width: 180, height: 122 },
-  ];
+  const steps = Array.isArray(model.steps) ? model.steps : [];
+  const transitions = Array.isArray(model.transitions) ? model.transitions : [];
+  const layout = layoutFlowDiagram(steps, transitions.map((transition) => ({
+    from: transition.from,
+    to: transition.to,
+    label: transition.label,
+    type: transition.type,
+  })));
 
-  const laneMarkup = [
-    { y: 118, label: '用户/触发' },
-    { y: 220, label: '核心流程' },
-    { y: 438, label: '结果/恢复' },
-  ].map((lane) => `
-    <g>
-      <line x1="70" y1="${lane.y}" x2="1020" y2="${lane.y}" stroke="#334155" stroke-width="1" stroke-dasharray="6,4"></line>
-      <text x="74" y="${lane.y - 8}" class="legend-label">${escapeHtml(lane.label)}</text>
-    </g>
-  `).join('\n');
-
-  const stepMarkup = model.steps
-    .map((step, index) => renderBox(step, layouts[step.id] ?? fallbackLayouts[index] ?? fallbackLayouts.at(-1)))
+  const stepMarkup = steps
+    .map((step) => {
+      const entry = layout.positioned.get(step.id);
+      return entry ? renderBox(step, entry) : '';
+    })
     .join('\n');
-  const transitions = [
-    { path: 'M 280 306 L 330 306', label: model.transitions[0]?.label ?? '开始', labelX: 288, labelY: 294, type: model.transitions[0]?.type ?? 'standard' },
-    { path: 'M 540 306 L 590 306', label: model.transitions[1]?.label ?? '核心步骤', labelX: 546, labelY: 294, type: model.transitions[1]?.type ?? 'standard' },
-    { path: 'M 770 282 C 800 240, 820 220, 820 196', label: model.transitions[2]?.label ?? '成功路径', labelX: 786, labelY: 226, type: model.transitions[2]?.type ?? 'standard' },
-    { path: 'M 770 330 C 800 370, 820 400, 820 420', label: model.transitions[3]?.label ?? '失败路径', labelX: 786, labelY: 388, type: model.transitions[3]?.type ?? 'error_path' },
-  ].map(renderArrow).join('\n');
+  const edgeMarkup = renderFlowEdges(layout);
 
+  const boundary = {
+    x: layout.config.marginX - 24,
+    y: layout.config.marginY - 36,
+    width: layout.width - (layout.config.marginX - 24) * 2,
+    height: layout.height - layout.config.marginY - 36,
+  };
+  const legendY = boundary.y + boundary.height + 30;
+  const legendMarkup = renderLegend([
+    { color: '#2563eb', label: '用户动作' },
+    { color: '#0f766e', label: '系统处理' },
+    { color: '#b45309', label: '决策' },
+    { color: '#4f46e5', label: '成功' },
+    { color: '#dc2626', label: '错误/恢复' },
+  ], legendY);
+
+  const svgHeight = legendY + 48;
   const svgMarkup = `
-    <svg viewBox="0 0 1080 720" role="img" aria-label="${escapeHtml(model.title)}">
-      <defs>
-        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-          <polygon points="0 0, 10 5, 0 10" fill="#7dd3fc"></polygon>
-        </marker>
-      </defs>
-      <rect x="56" y="92" width="968" height="520" rx="18" fill="none" stroke="#f59e0b" stroke-opacity="0.45" stroke-width="1.5" stroke-dasharray="8,5"></rect>
-      <text x="74" y="118" class="legend-label">产品流程边界</text>
-      ${laneMarkup}
-      ${transitions}
+    <svg viewBox="0 0 ${layout.width} ${svgHeight}" role="img" aria-label="${escapeHtml(model.title)}">
+      ${DIAGRAM_ARROW_DEFS}
+      <rect x="${boundary.x}" y="${boundary.y}" width="${boundary.width}" height="${boundary.height}" rx="18" fill="none" stroke="#b45309" stroke-opacity="0.45" stroke-width="1.5" stroke-dasharray="8,5"></rect>
+      <text x="${boundary.x + 18}" y="${boundary.y + 24}" class="legend-label">产品流程边界</text>
+      ${edgeMarkup}
       ${stepMarkup}
-      <g>
-        <text x="54" y="652" class="legend-label">图例</text>
-        <rect x="54" y="666" width="12" height="12" rx="3" fill="#22d3ee"></rect><text x="74" y="676" class="legend-label">用户动作</text>
-        <rect x="196" y="666" width="12" height="12" rx="3" fill="#34d399"></rect><text x="216" y="676" class="legend-label">系统处理</text>
-        <rect x="372" y="666" width="12" height="12" rx="3" fill="#f59e0b"></rect><text x="392" y="676" class="legend-label">决策</text>
-        <rect x="516" y="666" width="12" height="12" rx="3" fill="#c084fc"></rect><text x="536" y="676" class="legend-label">成功</text>
-        <rect x="648" y="666" width="12" height="12" rx="3" fill="#fb7185"></rect><text x="668" y="676" class="legend-label">错误/恢复</text>
-      </g>
+      ${legendMarkup}
     </svg>
   `;
 

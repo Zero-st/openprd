@@ -24,6 +24,7 @@ const BRAINSTORM_PANEL_ORDER = [
   'marketSignals',
   'validationLoop',
   'businessViability',
+  'minimalistReview',
   'risks',
   'reuseOpportunities',
 ];
@@ -46,13 +47,18 @@ const BRAINSTORM_PANEL_META = {
   },
   validationLoop: {
     title: '验证闭环',
-    description: '先说清去哪里找人、用户现在怎么解决，以及不做完整产品时先怎么跑起来。',
-    emptyText: '待补充社区入口、当前替代方案和手工交付路径。',
+    description: '先说清去哪里找人、为什么你能先触达、用户现在怎么解决，以及不做完整产品时先怎么跑起来。',
+    emptyText: '待补充社区入口、社区契合、当前替代方案和手工交付路径。',
   },
   businessViability: {
     title: '商业闭环',
-    description: '先定义真实承诺、最低成本验证动作，以及验证阶段怎样先活下来。',
-    emptyText: '待补充承诺信号、最低成本验证和先活下来方案。',
+    description: '先定义真实承诺、付费验证、最低成本验证动作，以及验证阶段怎样先活下来。',
+    emptyText: '待补充承诺信号、付费证明、最低成本验证和先活下来方案。',
+  },
+  minimalistReview: {
+    title: '极简判断',
+    description: '把保持小的执行方式、产品化门槛、可逆性和价值观判断摆出来，避免自嗨式扩张。',
+    emptyText: '待补充保持小的做法、产品化门槛和极简判断。',
   },
   reuseOpportunities: {
     title: '现有基础与复用',
@@ -77,6 +83,7 @@ const BRAINSTORM_TONE_META = {
   marketSignals: { tone: 'map', icon: 'market' },
   validationLoop: { tone: 'success', icon: 'goal' },
   businessViability: { tone: 'guardrail', icon: 'next' },
+  minimalistReview: { tone: 'map', icon: 'risk' },
   reuseOpportunities: { tone: 'guardrail', icon: 'reuse' },
   risks: { tone: 'risk', icon: 'risk' },
   nextSteps: { tone: 'success', icon: 'next' },
@@ -119,6 +126,7 @@ const BRAINSTORM_PRESENTATION_CONTRACT = {
         marketSignals: [{ summary: '15 字以内标签', detail: '60 字以内说明' }],
         validationLoop: [{ summary: '15 字以内标签', detail: '60 字以内说明' }],
         businessViability: [{ summary: '15 字以内标签', detail: '60 字以内说明' }],
+        minimalistReview: [{ summary: '15 字以内标签', detail: '60 字以内说明' }],
         reuseOpportunities: [{ summary: '15 字以内标签', detail: '60 字以内说明' }],
         risks: [{ summary: '15 字以内标签', detail: '60 字以内说明' }],
       },
@@ -608,11 +616,26 @@ function buildBrainstormCapturePatch(record) {
     'users.stakeholders': { value: listOfStrings(captureState.stakeholders), source: 'user-confirmed' },
     'validation.community': { value: listOfStrings(captureState.community), source: 'user-confirmed' },
     'validation.seedUsers': { value: listOfStrings(captureState.seedUsers), source: 'user-confirmed' },
+    'validation.communityFit': { value: listOfStrings(captureState.communityFit), source: 'user-confirmed' },
     'validation.currentAlternative': { value: normalizedText(captureState.currentAlternative || captureState.asIs), source: 'user-confirmed' },
+    'validation.painEvidence': { value: listOfStrings(captureState.painEvidence), source: 'user-confirmed' },
     'validation.manualPath': { value: listOfStrings(captureState.manualPath), source: 'user-confirmed' },
+    'validation.manualPlaybook': { value: listOfStrings(captureState.manualPlaybook), source: 'user-confirmed' },
     'validation.commitmentSignals': { value: listOfStrings(captureState.commitmentSignals), source: 'user-confirmed' },
     'validation.firstValidationStep': { value: normalizedText(captureState.firstValidationStep || captureState.nextStep), source: 'user-confirmed' },
     'validation.defaultAlivePlan': { value: listOfStrings(captureState.defaultAlivePlan), source: 'user-confirmed' },
+    'validation.paymentProof': { value: listOfStrings(captureState.paymentProof), source: 'user-confirmed' },
+    'validation.mvpSlice': { value: normalizedText(captureState.mvpSlice), source: 'user-confirmed' },
+    'validation.weekendTest': { value: normalizedText(captureState.weekendTest), source: 'user-confirmed' },
+    'validation.smallestExecution': { value: listOfStrings(captureState.smallestExecution), source: 'user-confirmed' },
+    'validation.productizeGate': { value: listOfStrings(captureState.productizeGate), source: 'user-confirmed' },
+    'validation.firstCustomerPath': { value: listOfStrings(captureState.firstCustomerPath), source: 'user-confirmed' },
+    'validation.pricingHypothesis': { value: normalizedText(captureState.pricingHypothesis), source: 'user-confirmed' },
+    'validation.customerOneProfitability': { value: normalizedText(captureState.customerOneProfitability), source: 'user-confirmed' },
+    'validation.growthDiscipline': { value: listOfStrings(captureState.growthDiscipline), source: 'user-confirmed' },
+    'validation.reversibility': { value: normalizedText(captureState.reversibility), source: 'user-confirmed' },
+    'validation.customerTruth': { value: normalizedText(captureState.customerTruth), source: 'user-confirmed' },
+    'validation.valuesFit': { value: normalizedText(captureState.valuesFit), source: 'user-confirmed' },
     'goals.goals': { value: listOfStrings(captureState.goals), source: 'user-confirmed' },
     'goals.successMetrics': { value: listOfStrings(captureState.successMetrics), source: 'user-confirmed' },
     'scope.inScope': { value: listOfStrings(captureState.inScope), source: 'user-confirmed' },
@@ -657,16 +680,31 @@ export function renderBrainstormMarkdown({ record }) {
     ]],
     ['当前替代方案', [
       summarizeText(normalizedText(record?.captureState?.currentAlternative || record?.captureState?.asIs), '待补充现在主要怎么解决'),
+      ...listOfStrings(record?.captureState?.communityFit).map((item) => `社区契合：${item}`),
+      ...listOfStrings(record?.captureState?.painEvidence).map((item) => `痛点证据：${item}`),
       summarizeText(record?.captureState?.whyNow, '待补充为什么现在值得做'),
     ]],
     ['验证闭环', [
       ...listOfStrings(record?.report?.validationLoop),
       ...listOfStrings(record?.captureState?.manualPath).map((item) => `手工路径：${item}`),
+      ...listOfStrings(record?.captureState?.manualPlaybook).map((item) => `手工作战卡：${item}`),
     ]],
     ['商业闭环', [
       ...listOfStrings(record?.report?.businessViability),
       ...listOfStrings(record?.captureState?.commitmentSignals).map((item) => `承诺信号：${item}`),
+      ...listOfStrings(record?.captureState?.paymentProof).map((item) => `付费证明：${item}`),
+      ...listOfStrings(record?.captureState?.growthDiscipline).map((item) => `增长纪律：${item}`),
     ]],
+    ['一件事 MVP 与成交路径', [
+      summarizeText(record?.captureState?.mvpSlice, '待补充第一版只做一件事'),
+      summarizeText(record?.captureState?.weekendTest, '待补充周末级验证'),
+      ...listOfStrings(record?.captureState?.smallestExecution).map((item) => `最小工具桥接：${item}`),
+      ...listOfStrings(record?.captureState?.productizeGate).map((item) => `产品化门槛：${item}`),
+      ...listOfStrings(record?.captureState?.firstCustomerPath).map((item) => `第一批客户路径：${item}`),
+      summarizeText(record?.captureState?.pricingHypothesis, '待补充初始收费假设'),
+      summarizeText(record?.captureState?.customerOneProfitability, '待补充客户 1 盈利路径'),
+    ]],
+    ['极简判断', listOfStrings(record?.report?.minimalistReview)],
     ['推荐方向', [
       summarizeText(record?.summary?.recommendedDirection, '待补充推荐方向'),
       ...listOfStrings(record.report?.directionOptions).slice(0, 3),
@@ -730,13 +768,14 @@ function renderPanel(kind, items) {
   const meta = BRAINSTORM_PANEL_META[kind];
   const normalized = items.filter((item) => item.summary || item.detail);
   return `
-    <section class="brainstorm-panel brainstorm-panel-${escapeHtml(brainstormTone(kind).tone)}">
+    <section class="brainstorm-panel brainstorm-panel-${escapeHtml(brainstormTone(kind).tone)}" id="brainstorm-panel-${escapeHtml(kind)}">
       <div class="panel-head">
         ${brainstormIcon(kind)}
         <div>
           <h3>${escapeHtml(meta.title)}</h3>
           <p>${escapeHtml(meta.description)}</p>
         </div>
+        <span class="panel-count${normalized.length === 0 ? ' empty' : ''}">${normalized.length === 0 ? '还没聊到' : `${normalized.length} 条`}</span>
       </div>
       <div class="chip-row">
         ${(normalized.length > 0
@@ -989,8 +1028,18 @@ function buildBrainstormExportPayload(record, artifactPaths) {
     currentAlternative: record.summary?.currentAlternative ?? null,
     confidenceLabel: record.summary?.confidenceLabel ?? null,
     assumptions: listOfStrings(record.captureState?.assumptions).slice(0, 3),
+    communityFit: listOfStrings(record.captureState?.communityFit).slice(0, 3),
+    painEvidence: listOfStrings(record.captureState?.painEvidence).slice(0, 3),
     commitmentSignals: listOfStrings(record.captureState?.commitmentSignals).slice(0, 3),
+    paymentProof: listOfStrings(record.captureState?.paymentProof).slice(0, 3),
     defaultAlivePlan: listOfStrings(record.captureState?.defaultAlivePlan).slice(0, 3),
+    manualPlaybook: listOfStrings(record.captureState?.manualPlaybook).slice(0, 3),
+    smallestExecution: listOfStrings(record.captureState?.smallestExecution).slice(0, 3),
+    productizeGate: listOfStrings(record.captureState?.productizeGate).slice(0, 3),
+    growthDiscipline: listOfStrings(record.captureState?.growthDiscipline).slice(0, 3),
+    firstCustomerPath: listOfStrings(record.captureState?.firstCustomerPath).slice(0, 3),
+    mvpSlice: normalizedText(record.captureState?.mvpSlice) || null,
+    pricingHypothesis: normalizedText(record.captureState?.pricingHypothesis) || null,
     stopLossActions: listOfStrings(record.captureState?.stopLossActions).slice(0, 3),
     openQuestions: listOfStrings(record.report?.openQuestions).slice(0, 5),
     markdownPath: artifactPaths.markdownPath,
@@ -1055,10 +1104,27 @@ export function renderBrainstormArtifact({ record, markdownPath, patchPath, stat
     `谁先要用：${joinedText(record?.captureState?.primaryUsers, { fallback: '待补充' })}`,
     `整理时间：${record.generatedAt}`,
   ];
-  const panels = BRAINSTORM_PANEL_ORDER.map((kind) => {
+  const panelEntries = BRAINSTORM_PANEL_ORDER.map((kind) => {
     const fallbackItems = listOfStrings(record.report?.[kind]);
-    return renderPanel(kind, presentationPanelItems(record, kind, fallbackItems));
-  }).join('');
+    const items = presentationPanelItems(record, kind, fallbackItems);
+    const count = items.filter((item) => item.summary || item.detail).length;
+    return { kind, items, count, title: BRAINSTORM_PANEL_META[kind].title };
+  });
+  const panels = panelEntries.map((entry) => renderPanel(entry.kind, entry.items)).join('');
+  const emptyPanels = panelEntries.filter((entry) => entry.count === 0);
+  const agendaMarkup = `
+      <nav class="brainstorm-agenda" aria-label="讨论清单">
+        <p class="brainstorm-agenda-title">这次讨论共 ${panelEntries.length} 块${emptyPanels.length > 0 ? `，还有 ${emptyPanels.length} 块没聊到` : '，每一块都有内容了'}</p>
+        <div class="brainstorm-agenda-links">
+          ${panelEntries.map((entry, index) => `
+          <a href="#brainstorm-panel-${escapeHtml(entry.kind)}" class="brainstorm-agenda-link${entry.count === 0 ? ' empty' : ''}">
+            <span class="brainstorm-agenda-index">${index + 1}</span>
+            <span>${escapeHtml(entry.title)}</span>
+            <span class="brainstorm-agenda-count">${entry.count === 0 ? '待聊' : `${entry.count} 条`}</span>
+          </a>`).join('')}
+        </div>
+      </nav>
+  `;
   const artifactPaths = { markdownPath, patchPath, statePath };
 
   return `<!DOCTYPE html>
@@ -1381,6 +1447,87 @@ export function renderBrainstormArtifact({ record, markdownPath, patchPath, stat
         gap: 12px;
         align-items: flex-start;
       }
+      .panel-count {
+        flex-shrink: 0;
+        margin-left: auto;
+        padding: 3px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(37,99,235,0.25);
+        background: rgba(37,99,235,0.06);
+        color: var(--review-blue);
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .panel-count.empty {
+        border-color: var(--review-line);
+        background: var(--review-panel-soft);
+        color: var(--review-muted);
+        font-weight: 400;
+      }
+      .brainstorm-agenda {
+        margin-top: 18px;
+        padding: 16px 20px;
+        border-radius: 16px;
+        border: 1px solid var(--review-line);
+        background: var(--review-panel);
+        box-shadow: 0 10px 24px rgba(23,32,51,0.05);
+      }
+      .brainstorm-agenda-title {
+        margin: 0;
+        color: var(--review-text);
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .brainstorm-agenda-links {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .brainstorm-agenda-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--review-line);
+        background: var(--review-panel-soft);
+        color: var(--review-text);
+        text-decoration: none;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .brainstorm-agenda-link:hover {
+        border-color: rgba(37,99,235,0.4);
+        background: #ffffff;
+      }
+      .brainstorm-agenda-link.empty { color: var(--review-muted); }
+      .brainstorm-agenda-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: rgba(37,99,235,0.1);
+        color: var(--review-blue);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .brainstorm-agenda-link.empty .brainstorm-agenda-index {
+        background: var(--review-line);
+        color: var(--review-muted);
+      }
+      .brainstorm-agenda-count {
+        color: var(--review-blue);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .brainstorm-agenda-link.empty .brainstorm-agenda-count {
+        color: var(--review-muted);
+        font-weight: 400;
+      }
       .brainstorm-icon {
         flex: 0 0 auto;
         display: inline-flex;
@@ -1605,6 +1752,7 @@ export function renderBrainstormArtifact({ record, markdownPath, patchPath, stat
         </section>
       </section>
 
+      ${agendaMarkup}
       ${visualScenes.map((scene, index) => renderVisualScene(scene, index)).join('\n')}
       <section class="panel-grid">${panels}</section>
     </main>

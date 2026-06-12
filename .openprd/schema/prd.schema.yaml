@@ -27,6 +27,31 @@ sections:
       - successMetrics
       - acceptanceGoals
 
+  validation:
+    requiredFields:
+      - community
+      - seedUsers
+      - communityFit
+      - currentAlternative
+      - painEvidence
+      - manualPath
+      - manualPlaybook
+      - commitmentSignals
+      - firstValidationStep
+      - defaultAlivePlan
+      - paymentProof
+      - mvpSlice
+      - weekendTest
+      - smallestExecution
+      - productizeGate
+      - firstCustomerPath
+      - pricingHypothesis
+      - customerOneProfitability
+      - growthDiscipline
+      - reversibility
+      - customerTruth
+      - valuesFit
+
   scope:
     requiredFields:
       - inScope
