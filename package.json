@@ -1,6 +1,6 @@
 {
   "name": "@openprd/cli",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "AI-native PRD workspace and lifecycle CLI",
   "type": "module",
   "license": "MIT",

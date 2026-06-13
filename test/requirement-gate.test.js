@@ -365,6 +365,22 @@ describe('Codex requirement gate', () => {
     assert.deepEqual(tinySpacingPromptPayload, { continue: true });
     assert.equal(await pathExists(path.join(project, '.openprd', 'harness', 'requirement-gate.json')), false);
 
+    const learningMaterialPayload = runCodexHook(project, 'UserPromptSubmit', {
+      prompt: '请生成一份仙侠风格的学习材料',
+    });
+    assert.equal(learningMaterialPayload.continue, true);
+    assert.ok(learningMaterialPayload.hookSpecificOutput.additionalContext.includes('学习型交付物'));
+    assert.ok(learningMaterialPayload.hookSpecificOutput.additionalContext.includes('不是固定关键词表'));
+    assert.ok(learningMaterialPayload.hookSpecificOutput.additionalContext.includes('openprd learn . --topic "<学习主题>" --genre xianxia --open'));
+    assert.ok(learningMaterialPayload.hookSpecificOutput.additionalContext.includes('普通 Markdown 只能作为辅助讲义'));
+    assert.equal(await pathExists(path.join(project, '.openprd', 'harness', 'requirement-gate.json')), false);
+    const learningStopReminder = runCodexHook(project, 'Stop', {});
+    assert.equal(learningStopReminder.continue, true);
+    assert.ok(learningStopReminder.hookSpecificOutput.additionalContext.includes('学习型交付物'));
+    assert.ok(learningStopReminder.hookSpecificOutput.additionalContext.includes('学习包阅读器'));
+    assert.ok(learningStopReminder.hookSpecificOutput.additionalContext.includes('openprd learn . --topic "<学习主题>" --genre xianxia --open'));
+    assert.ok(learningStopReminder.hookSpecificOutput.additionalContext.includes('普通 Markdown'));
+
     const imageGenerationPayload = runCodexHook(project, 'UserPromptSubmit', {
       prompt: '帮我生成一张活动封面图，先给我看图片效果。',
     });

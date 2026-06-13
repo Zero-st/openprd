@@ -2,7 +2,7 @@
   "version": 1,
   "enabled": true,
   "strategy": "semver",
-  "currentVersion": "0.1.11",
+  "currentVersion": "0.1.13",
   "versions": [
     {
       "version": "0.1.2",
@@ -404,9 +404,9 @@
     },
     {
       "version": "0.1.11",
-      "status": "current",
+      "status": "released",
       "createdAt": "2026-06-12 18:41:53",
-      "updatedAt": "2026-06-12 18:42:41",
+      "updatedAt": "2026-06-14 02:36:54",
       "notes": null,
       "items": [
         {
@@ -455,8 +455,29 @@
         }
       ],
       "tag": null
+    },
+    {
+      "version": "0.1.13",
+      "status": "current",
+      "createdAt": "2026-06-14 02:36:54",
+      "updatedAt": "2026-06-14 02:36:54",
+      "notes": null,
+      "items": [
+        {
+          "type": "优化",
+          "summary": "优化",
+          "detail": "学习材料请求按产物形态进入 openprd learn 阅读器流程",
+          "sentence": "优化：学习材料请求按产物形态进入 openprd learn 阅读器流程",
+          "recordedAt": "2026-06-14 02:36:54",
+          "source": {
+            "kind": "manual-note",
+            "manualId": "manual-note-1781375814050"
+          }
+        }
+      ],
+      "tag": null
     }
   ],
   "createdAt": "2026-06-02 21:28:04",
-  "updatedAt": "2026-06-12 18:42:41"
+  "updatedAt": "2026-06-14 02:36:54"
 }

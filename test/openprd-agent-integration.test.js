@@ -208,6 +208,8 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.ok(generatedAgents.includes('学习包和阅读器'));
     assert.ok(generatedAgents.includes('期望产物是否需要章节结构'));
     assert.ok(generatedAgents.includes('不要用关键词表触发'));
+    assert.ok(generatedAgents.includes('仙侠风格的学习材料'));
+    assert.ok(generatedAgents.includes('`--genre` 题材参数'));
     assert.ok(generatedAgents.includes('没有参考图时先判断新建界面还是修改既有界面'));
     assert.ok(generatedAgents.includes('task-scoped Markdown/HTML 测试报告路径'));
     assert.ok(generatedAgents.includes('Markdown / HTML 测试报告'));
@@ -271,6 +273,8 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.ok(generatedCommandCatalog.includes('openprd review . --open'));
     assert.ok(generatedCommandCatalog.includes('openprd loop . --run --agent codex|claude --dry-run'));
     assert.ok(generatedCommandCatalog.includes('openprd learn . --topic <text> --open'));
+    assert.ok(generatedCommandCatalog.includes('openprd learn . --topic <text> --genre xianxia --open'));
+    assert.ok(generatedCommandCatalog.includes('仙侠风格的学习材料'));
     assert.ok(generatedCommandCatalog.includes('默认先走这条路径'));
     assert.ok(generatedCommandCatalog.includes('章节、证据锚点、图文讲解、检索练习或阅读体验'));
     assert.ok(generatedCommandCatalog.includes('openprd visual-compare . --reference <效果图> --actual <实现截图>'));
@@ -401,6 +405,7 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.ok(generatedHarnessSkill.includes('产物形态'));
     assert.ok(generatedHarnessSkill.includes('不要用关键词表触发'));
     assert.ok(generatedHarnessSkill.includes('普通 Markdown 只能作为辅助讲义'));
+    assert.ok(generatedHarnessSkill.includes('仙侠风格的学习材料'));
     assert.ok(generatedHarnessSkill.includes('冷启动没有现有界面'));
     assert.ok(generatedHarnessSkill.includes('视觉决策成本和验证风险'));
     assert.ok(generatedHarnessSkill.includes('同一张证据板'));
@@ -428,6 +433,8 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     const generatedCodexHook = await fs.readFile(path.join(project, '.codex', 'hooks', 'openprd-hook.mjs'), 'utf8');
     assert.ok(generatedCodexHook.includes('执行确认清单'));
     assert.ok(generatedCodexHook.includes('期望产物形态'));
+    assert.ok(generatedCodexHook.includes('learningMaterialRequest'));
+    assert.ok(generatedCodexHook.includes('学习型交付物'));
     assert.ok(generatedCodexHook.includes('冷启动没有现有界面'));
     assert.ok(generatedCodexHook.includes('新建界面应先完成 3 方向方案评审'));
     assert.ok(generatedCodexHook.includes('已确认，我按这个继续'));

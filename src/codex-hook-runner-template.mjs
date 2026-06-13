@@ -1262,6 +1262,54 @@ function renderRunContextText(result) {
   return lines.filter(Boolean).join('\n');
 }
 
+function inferLearningGenre(text) {
+  const value = String(text || '');
+  if (/仙侠|修仙|玄幻/.test(value)) {
+    return 'xianxia';
+  }
+  if (/武侠/.test(value)) {
+    return 'wuxia';
+  }
+  if (/童话|寓言/.test(value)) {
+    return 'fairy-tale';
+  }
+  if (/科幻|赛博|cyberpunk|sci[-\s]?fi/i.test(value)) {
+    return 'sci-fi';
+  }
+  if (/互联网产品|产品经理|PM/i.test(value)) {
+    return 'internet-product';
+  }
+  return null;
+}
+
+function detectLearningMaterialIntent(prompt) {
+  const text = stripMarkdown(prompt).trim();
+  if (!text) {
+    return { requested: false, genre: null, reason: null };
+  }
+  const explicitChatOnly = /(只要|仅要|仅需|就|直接).{0,16}(在对话里|回复|回答|写一段|一段文字|短文|纯文本|普通文本)|不要.{0,18}(文件|阅读器|学习包|HTML|html|openprd)/i.test(text);
+  const durableReaderSignal = /(可长期阅读|长期阅读|可回看|阅读器|reader|电子书|学习包|归档)/i.test(text);
+  if (explicitChatOnly && !durableReaderSignal) {
+    return { requested: false, genre: null, reason: 'chat-only-requested' };
+  }
+
+  // This is an intent-shape detector, not a closed keyword table. The hook
+  // looks for a requested learning deliverable, its durability/teaching goal,
+  // and whether the expected output wants reader-like structure.
+  const deliveryAction = /(生成|整理|产出|做一份|做一套|做个|做一个|创建|写一份|准备|沉淀|归档|转成|转换成|变成|输出|构建|给我)/i.test(text);
+  const learningGoal = /(学习|教学|培训|复盘|教程|讲义|教材|课程|知识沉淀|经验沉淀|可回看|可复用|长期阅读|新人入门|onboarding)/i.test(text);
+  const readerShape = /(学习(材料|资料|包|读本|文档)|复盘材料|教学材料|培训材料|教程|讲义|教材|课程|读本|电子书|阅读器|reader|ebook|章节|目录|证据锚点|图文讲解|检索练习|工作示例|可长期阅读|长期阅读)/i.test(text);
+  const workToLearningArtifact = /(把|将|基于|围绕).{0,48}(工作|任务|过程|对话|会话|修复|需求|项目|实现|经验|记录|材料).{0,32}(转成|转换成|整理成|沉淀成|归档成|做成|写成).{0,40}(学习|复盘|教学|教程|讲义|材料|读本|可回看|可复用|长期阅读)/i.test(text);
+  const requested = workToLearningArtifact
+    || (readerShape && (deliveryAction || learningGoal || durableReaderSignal))
+    || (learningGoal && durableReaderSignal);
+  return {
+    requested,
+    genre: requested ? inferLearningGenre(text) : null,
+    reason: workToLearningArtifact ? 'work-to-learning-artifact' : (readerShape ? 'reader-shaped-learning-artifact' : (requested ? 'durable-learning-goal' : null)),
+  };
+}
+
 function analyzePromptIntent(prompt) {
   const text = String(prompt || '').trim();
   const normalized = text.toLowerCase();
@@ -1500,6 +1548,8 @@ function analyzePromptIntent(prompt) {
   const visualMockupRequest = imageGenerationTerms.test(text)
     && imageGenerationAction.test(text)
     && !codeVisualArtifactRequested;
+  const learningMaterialIntent = detectLearningMaterialIntent(text);
+  const learningMaterialRequest = learningMaterialIntent.requested;
   const visualReview = /效果图|实现截图|视觉对比|视觉评审|对标效果图|复刻|不一致|好丑|没对齐|对不上|不像/i.test(text);
   const directBugfixExecution = explicitExecution && bugfixOrDiagnostic;
   const newFeatureVerbMatched = /(新增|增加|新建)/.test(text);
@@ -1596,6 +1646,9 @@ function analyzePromptIntent(prompt) {
     weappValidationRequest,
     browserSafetyRequest,
     productCopyRequest,
+    learningMaterialRequest,
+    learningGenre: learningMaterialIntent.genre,
+    learningMaterialReason: learningMaterialIntent.reason,
     shouldInject: requiresIntake
       || requirementTier === 'l1'
       || explicitExecution
@@ -1611,6 +1664,7 @@ function analyzePromptIntent(prompt) {
       || weappValidationRequest
       || browserSafetyRequest
       || productCopyRequest
+      || learningMaterialRequest
       || /openprd/i.test(normalized)
       || /\bprd\b/i.test(normalized),
   };
@@ -2860,11 +2914,26 @@ function visualMockupMessage(intent) {
   ].join('\n');
 }
 
-function learningReviewMessage() {
-  return [
+function learningGenreFlag(intent = null) {
+  return intent?.learningGenre ? ` --genre ${intent.learningGenre}` : '';
+}
+
+function learningReviewCommand(intent = null) {
+  return `openprd learn . --topic "<学习主题>"${learningGenreFlag(intent)} --open`;
+}
+
+function learningReviewMessage(intent = null) {
+  const command = learningReviewCommand(intent);
+  const lines = [
     '如果当前交付目标是把一次工作转成可学习、可复用、可回看、可教学或可沉淀的材料，不要先按关键词判断，也不要只停留在普通说明文档。',
     '先判断期望产物形态：是否需要章节结构、证据锚点、图文讲解、检索练习、工作示例或阅读体验。需要这些形态时，优先使用 `openprd learn .` 生成学习包骨架、阅读器和证据清单，再补充正文内容；普通 Markdown 只能作为辅助讲义。',
-  ].join('\n');
+  ];
+  if (intent?.learningMaterialRequest) {
+    lines.unshift('当前输入已被识别为学习型交付物请求：这是按产物形态和长期阅读/教学目的判断，不是固定关键词表。');
+    lines.push(`建议先运行 \`${command}\`。如果用户指定了仙侠、科幻、童话等风格，把它当作学习包题材/文体参数，而不是绕过阅读器流程的理由。`);
+    lines.push('生成骨架后，读取 `.openprd/learning/archive/<packageId>/agent-prompt.md`，由 Agent 基于证据写入 `learning-content.json`，再运行 `openprd learn . --content-json <file> --open` 渲染最终 reader；不要把聊天里的普通 Markdown 成稿当完成。');
+  }
+  return lines.join('\n');
 }
 
 function largeUiVisualDirectionMessage() {
@@ -3034,7 +3103,7 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
         'OpenPrd 上下文只是建议，不是自动执行指令。请先判断用户当前意图。',
         lightweightRequirementMessage(intent),
         visualMockupMessage(intent),
-        learningReviewMessage(),
+        learningReviewMessage(intent),
         largeUiVisualDirectionMessage(),
         visualLocalAdjustmentMessage(),
         requirementRoutingSummary(),
@@ -3056,7 +3125,7 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
       'OpenPrd 上下文只是建议，不是自动执行指令。请先判断用户当前意图。',
       lightweightRequirementMessage(intent),
       visualMockupMessage(intent),
-      learningReviewMessage(),
+      learningReviewMessage(intent),
       largeUiVisualDirectionMessage(),
       visualLocalAdjustmentMessage(),
       requirementRoutingSummary(),
@@ -3083,6 +3152,7 @@ function contextMessage(cwd, intent = null, gate = null, progress = null) {
     gateMessage,
     lightweightRequirementMessage(intent),
     visualMockupMessage(intent),
+    learningReviewMessage(intent),
     largeUiVisualDirectionMessage(intent),
     requirementRoutingSummary(),
     'OpenPrd 下一步只是建议。规划、分析、审查类请求保持只读；只有用户当前明确要求开发、深度调研、对标复刻或继续任务时才执行。',
@@ -3113,6 +3183,7 @@ function shouldInjectOpenPrdContext(payload) {
     && !intent.publicRepoResearchRequest
     && !intent.externalTechResearchRequest
     && !intent.skillWorkflowEditRequest
+    && !intent.learningMaterialRequest
   ) {
     return false;
   }
@@ -3336,6 +3407,56 @@ function visualEvidenceStopReminder(root, turnState, stopIntent) {
     'OpenPrd 在本轮收工回顾里发现 UI/视觉任务已有截图、实测或前端改动，但还没有本轮拼图证据。',
     `普通截图和 Computer 实测截图只能作为原始素材，不能单独替代视觉收口。请先运行 ${preferred}。`,
     '补齐前不要宣称界面视觉已经完成；可以如实说功能或代码已改，但视觉拼图证据还没补齐。',
+  ].join('\n');
+}
+
+function recentLearningArtifactPaths(root, turnState, matcher) {
+  const dir = path.join(root, '.openprd/learning/archive');
+  const startedAtMs = parseShanghaiTimestamp(turnState?.startedAt);
+  return collectRecentArtifactPaths(dir, startedAtMs, matcher, []);
+}
+
+function hasRecentLearningSkeletonArtifact(root, turnState) {
+  return recentLearningArtifactPaths(root, turnState, (artifactPath) => {
+    const normalized = artifactPath.split(path.sep).join('/');
+    return /\/(?:agent-prompt\.md|reader\.html|learning-package\.json|learning-content\.json)$/i.test(normalized);
+  }).length > 0;
+}
+
+function hasRecentAuthoredLearningReaderArtifact(root, turnState) {
+  const contentPaths = recentLearningArtifactPaths(root, turnState, (artifactPath) => artifactPath.endsWith('learning-content.json'));
+  return contentPaths.some((contentPath) => {
+    const content = readJsonSync(contentPath, null);
+    if (!content || content.authoringStatus !== 'agent-authored') {
+      return false;
+    }
+    if (!Array.isArray(content.chapters) || content.chapters.length === 0) {
+      return false;
+    }
+    const readerPath = path.join(path.dirname(contentPath), 'reader.html');
+    return fs.existsSync(readerPath);
+  });
+}
+
+function learningMaterialStopReminder(root, turnState, stopIntent) {
+  if (!stopIntent?.learningMaterialRequest) {
+    return null;
+  }
+  if (hasRecentAuthoredLearningReaderArtifact(root, turnState)) {
+    return null;
+  }
+  const command = learningReviewCommand(stopIntent);
+  if (!hasRecentLearningSkeletonArtifact(root, turnState)) {
+    return [
+      'OpenPrd 在本轮收工回顾里识别到用户要的是学习型交付物，但还没有看到本轮新生成的学习包阅读器。',
+      '请先运行 `' + command + '`，生成 `.openprd/learning/archive/<packageId>/` 下的证据清单、Agent 写作提示、learning-content.json 骨架和 reader.html。',
+      '这类请求按产物形态和长期阅读/教学目的判断，不是固定关键词表；普通 Markdown 只能作为辅助讲义，不能替代 OpenPrd reader。',
+    ].join('\n');
+  }
+  return [
+    'OpenPrd 在本轮收工回顾里发现学习包骨架已经出现，但还没有本轮 Agent-authored 的最终 reader 内容。',
+    '请读取 `.openprd/learning/archive/<packageId>/agent-prompt.md`，基于证据写入 `learning-content.json`，再运行 `openprd learn . --content-json <file> --open` 重新渲染。',
+    '完成前不要把聊天里的普通 Markdown 成稿当作学习材料交付完成。',
   ].join('\n');
 }
 
@@ -3785,6 +3906,10 @@ function handle(eventName, cwd, payload) {
     const visualReminder = visualEvidenceStopReminder(root, turnState, stopIntent);
     if (visualReminder) {
       return allowHook(visualReminder);
+    }
+    const learningReminder = learningMaterialStopReminder(root, turnState, stopIntent);
+    if (learningReminder) {
+      return allowHook(learningReminder);
     }
     const devCheckMessage = devCheckWrapUpMessage(root, turnState);
     if (devCheckMessage) {
