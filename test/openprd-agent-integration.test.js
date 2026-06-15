@@ -211,6 +211,8 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.ok(generatedAgents.includes('仙侠风格的学习材料'));
     assert.ok(generatedAgents.includes('`--genre` 题材参数'));
     assert.ok(generatedAgents.includes('没有参考图时先判断新建界面还是修改既有界面'));
+    assert.ok(generatedAgents.includes('轻量 UI 可视优化'));
+    assert.ok(generatedAgents.includes('build、package、`openprd dev-check` 和单张原始截图不能替代视觉证据'));
     assert.ok(generatedAgents.includes('task-scoped Markdown/HTML 测试报告路径'));
     assert.ok(generatedAgents.includes('Markdown / HTML 测试报告'));
     assert.equal(generatedAgents.includes('## Skill Routing'), false);
@@ -218,6 +220,15 @@ test('setup enables Codex hooks while preserving user hook groups', async () => 
     assert.equal(generatedAgents.includes('## Working Principles'), false);
     assert.equal(generatedAgents.includes('### 标准命令'), false);
     assert.equal(generatedAgents.includes('超过 1500 行要判断本轮是否扩大职责'), false);
+
+    const generatedHook = await fs.readFile(path.join(project, '.codex', 'hooks', 'openprd-hook.mjs'), 'utf8');
+    assert.ok(generatedHook.includes('LIGHTWEIGHT_UI_VISUAL_SIGNAL_PATTERN'));
+    assert.ok(generatedHook.includes('卡片宽度、间距、留白'));
+    assert.ok(generatedHook.includes('build、package 和 dev-check'));
+
+    const commandCatalog = await fs.readFile(path.join(project, '.openprd', 'harness', 'command-catalog.md'), 'utf8');
+    assert.ok(commandCatalog.includes('轻量 UI 可视优化'));
+    assert.ok(commandCatalog.includes('不能替代 `visual-compare` 或证据板'));
     assert.equal(generatedAgents.includes('个性化偏好只进入 user-local 范围'), false);
     assert.equal(generatedAgents.includes('## 大量只读扫描调度'), false);
     assert.equal(generatedAgents.includes('spark-code-researcher'), false);

@@ -17,3 +17,14 @@ test('inferTestStrategyForTask only upgrades to weapp runtime for explicit runti
   assert.notDeepEqual(copyStrategy.layers, ['integration', 'weapp']);
   assert.notEqual(copyStrategy.scope, 'weapp-runtime');
 });
+
+test('inferTestStrategyForTask treats lightweight visible UI fixes as visual flow', () => {
+  const strategy = inferTestStrategyForTask({
+    title: '这个间距留着有点多，把卡片宽度增大一些',
+  });
+
+  assert.deepEqual(strategy.layers, ['integration', 'e2e']);
+  assert.equal(strategy.scope, 'visual-flow');
+  assert.match(strategy.evidencePlan, /before\/after|verification-board/);
+  assert.match(strategy.upgradeReason, /轻量 UI 可视优化/);
+});

@@ -1209,6 +1209,41 @@ test('Stop hook injects dev-check wrap-up table for touched large files', async 
   assert.match(payload.hookSpecificOutput.additionalContext, /1501 行（> 1500 行\/文件）/);
 });
 
+test('Stop hook reminds lightweight visible UI fixes need visual evidence', async () => {
+  const project = await makeTempProject();
+  await initWorkspace(project, { templatePack: 'consumer' });
+  await fs.mkdir(path.join(project, 'src', 'styles'), { recursive: true });
+  await fs.writeFile(path.join(project, 'src', 'styles', 'cards.css'), '.card { max-width: 720px; }\n');
+
+  await fs.writeFile(path.join(project, '.openprd', 'harness', 'turn-state.json'), `${JSON.stringify({
+    version: 1,
+    prompt: '这个间距留着有点多，是不是可以考虑卡片的宽度都增大一些',
+    touchedFiles: ['src/styles/cards.css'],
+  }, null, 2)}\n`);
+
+  const stop = spawnSync(process.execPath, [path.join(project, '.codex', 'hooks', 'openprd-hook.mjs'), 'Stop'], {
+    cwd: project,
+    input: JSON.stringify({
+      cwd: project,
+      hook_event_name: 'Stop',
+    }),
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      OPENPRD_CLI: path.resolve('openprd/bin/openprd.js'),
+    },
+  });
+  assert.equal(stop.status, 0);
+  const payload = JSON.parse(stop.stdout);
+  assert.equal(payload.continue, true);
+  const context = payload.hookSpecificOutput.additionalContext;
+  assert.match(context, /卡片宽度、间距、留白/);
+  assert.match(context, /轻量可视优化/);
+  assert.match(context, /build、package 和 dev-check/);
+  assert.match(context, /--before\/--after/);
+  assert.match(context, /verification-board/);
+});
+
 test('Stop hook asks for project-level experience in structured plain language', async () => {
   const project = await makeTempProject();
   await initWorkspace(project, { templatePack: 'consumer' });

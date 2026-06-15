@@ -1391,7 +1391,7 @@ function analyzePromptIntent(prompt) {
     /copy/i,
   ];
   const simpleConcretePatterns = [
-    /按钮|文案|颜色|圆角|位置|间距|字号|图标|标题|空格|标点|label|copy/i,
+    /按钮|文案|颜色|圆角|位置|间距|留白|边距|宽度|高度|卡片|字号|图标|标题|空格|标点|对齐|密度|label|copy|padding|margin|spacing|gap/i,
     /从.+(改到|移到|移动到|换到|变成|改成|改为).+/,
   ];
   const l2StructuralScopePatterns = [
@@ -1527,7 +1527,8 @@ function analyzePromptIntent(prompt) {
     || /失败.{0,20}(原因|根因|排查|定位|修|修复|处理|解决)|(?:原因|根因|排查|定位).{0,20}失败/.test(text);
   const tinyEdit = tinyEditPatterns.some((pattern) => pattern.test(text));
   const crossSystemRiskMatched = crossSystemRiskPatterns.some((pattern) => pattern.test(text));
-  const localUiScopeMatched = /(按钮|文案|颜色|圆角|位置|间距|字号|图标|标题|空格|标点|label|copy|toast|placeholder|样式|页面|界面|布局|信息架构|导航|列表|详情页|设置页)/i.test(text);
+  const localUiScopeMatched = hasLightweightUiVisualSignal(text)
+    || /(样式|页面|界面|布局|信息架构|导航|列表|详情页|设置页)/i.test(text);
   const reviewContinuationRequested = reviewContinuationPatterns.some((pattern) => pattern.test(text));
   const explicitExecution = internalOpenPrdExecution
     || continuationVerbMatched
@@ -1538,6 +1539,7 @@ function analyzePromptIntent(prompt) {
   const noReviewRequested = noReviewRequestedPatterns.some((pattern) => pattern.test(text));
   const noConfirmationRequested = noConfirmationRequestedPatterns.some((pattern) => pattern.test(text));
   const reviewDecision = promptReviewCommand?.mark
+    ?? (reviewContinuationRequested ? 'confirmed' : null)
     ?? (reviewConfirmPatterns.some((pattern) => pattern.test(text)) ? 'confirmed' : null)
     ?? (reviewNeedsRevisionPatterns.some((pattern) => pattern.test(text)) ? 'needs-revision' : null);
   const confirmation = implementationConfirmation || Boolean(reviewDecision);
@@ -1567,19 +1569,16 @@ function analyzePromptIntent(prompt) {
   const requirementSignalMatched = requirementRoutingSignalsStrong.some((pattern) => pattern.test(text))
     || (requirementRoutingSignalsWeak.some((pattern) => pattern.test(text))
       && requirementChangeIntentSignals.some((pattern) => pattern.test(text)));
-  const l2FeatureExpansionMatched = !localUiScopeMatched
-    && (
-      (capabilityCreationMatched && (strategicL2ScopeMatched || structuralExpansionMatched))
-      || (newFeatureVerbMatched && text.length > 18)
-    );
+  const l2FeatureExpansionMatched = (capabilityCreationMatched && (strategicL2ScopeMatched || structuralExpansionMatched))
+    || (!localUiScopeMatched && newFeatureVerbMatched && text.length > 18);
   const l2PlanningRequestMatched = !readOnly
     && featurePlanningMatched
     && requirementChangeIntentSignals.some((pattern) => pattern.test(text))
     && (strategicL2ScopeMatched || structuralExpansionMatched);
   const l1OptimizationMatched = l1OptimizationPatterns.some((pattern) => pattern.test(text))
-    && /(页面|界面|视觉|样式|布局|信息架构|交互|体验|流程|入口|导航|表单|设置页|列表|详情页)/i.test(text);
+    && (hasLightweightUiVisualSignal(text) || /(页面|界面|视觉|样式|布局|信息架构|交互|体验|流程|入口|导航|表单|设置页|列表|详情页)/i.test(text));
   const l0AdjustmentMatched = l0AdjustmentPatterns.some((pattern) => pattern.test(text))
-    && /(按钮|文案|颜色|圆角|位置|间距|字号|图标|标题|空格|标点|label|copy|toast|placeholder|样式|一处)/i.test(text);
+    && (hasLightweightUiVisualSignal(text) || /(样式|一处)/i.test(text));
   const publicRepoResearchRequest = githubRepoPattern.test(text)
     && /(github|仓库|repo|项目|参考|对标|复刻|review|学习|架构|模块|流程|构建|测试|扩展点)/i.test(text);
   const externalTechResearchRequest = /(第三方|library|framework|sdk|api|mcp|cli|依赖|包|版本|迁移|弃用|官方文档|参数|返回值|生命周期)/i.test(text)
@@ -2216,6 +2215,12 @@ function isMutationPayload(payload, risk) {
     || /apply_patch/i.test(tool)
     || /apply_patch/i.test(text)
     || /\*\*\* Begin Patch/.test(text);
+}
+
+const LIGHTWEIGHT_UI_VISUAL_SIGNAL_PATTERN = /(按钮|文案|颜色|圆角|位置|间距|留白|边距|内边距|外边距|宽度|高度|卡片|字号|字体|行高|图标|标题|空格|标点|对齐|密度|阴影|边框|层级|组件|输入框|菜单|侧栏|表格|列表|头像|badge|label|copy|toast|placeholder|padding|margin|spacing|gap|太宽|太窄|太挤|拥挤|松散|留得多|留着有点多|没对齐|好看|美观)/i;
+
+function hasLightweightUiVisualSignal(text = '') {
+  return LIGHTWEIGHT_UI_VISUAL_SIGNAL_PATTERN.test(String(text || ''));
 }
 
 function isFrontendTaskIntent(intent = null) {
@@ -3382,6 +3387,7 @@ function hasRecentVisualReviewArtifact(root, turnState) {
 function isVisualEvidenceIntent(intent = null) {
   const text = String(intent?.promptText || '');
   return isFrontendTaskIntent(intent)
+    || hasLightweightUiVisualSignal(text)
     || /(界面|页面|前端|视觉|样式|布局|信息架构|效果图|设计稿|参考图|实现截图|视觉对比|视觉评审|截图|实测|Computer\s*Use|Browser|Playwright|复刻|不一致|好丑|没对齐|对不上|不像)/i.test(text);
 }
 
@@ -3405,6 +3411,7 @@ function visualEvidenceStopReminder(root, turnState, stopIntent) {
     : '有参考图时用 `--reference/--actual`，无参考且改既有界面用 `--before/--after`，普通截图实测用 `--board <verification-board.json>`';
   return [
     'OpenPrd 在本轮收工回顾里发现 UI/视觉任务已有截图、实测或前端改动，但还没有本轮拼图证据。',
+    '即便只是卡片宽度、间距、留白、对齐、颜色、圆角、字号这类轻量可视优化，也需要留下视觉证据；build、package 和 dev-check 不能替代视觉收口。',
     `普通截图和 Computer 实测截图只能作为原始素材，不能单独替代视觉收口。请先运行 ${preferred}。`,
     '补齐前不要宣称界面视觉已经完成；可以如实说功能或代码已改，但视觉拼图证据还没补齐。',
   ].join('\n');
@@ -3834,7 +3841,7 @@ function handle(eventName, cwd, payload) {
       recordRunHook(root, baseEvent, 'allowed-medium-risk');
       updateHookState(root, baseEvent);
       recordTouchedFiles(root, payload);
-      return allowHook('OpenPrd 检测到写入动作。本轮写入完成后、最终回复前，请针对实际 touched code files 运行 openprd dev-check . <file...>；如出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，说明影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试；如涉及界面视觉且已有参考效果图并进入实现阶段，阶段性完成后运行 openprd visual-compare . --reference <效果图> --actual <实现截图> 并查看 JPG 对比图；如果参考图来自本轮或前序 `imagegen`，先确认用户已接受它作为后续对比参考；若一张图里有多个子图、对象或网格，先运行 openprd visual-prepare . --reference <效果图> --grid <列>x<行> 或 --boxes <plan.json>，确认 contact sheet 后再逐项对比。若局部细节更重要，再补 openprd visual-compare . --board <focus-board.json>；如无参考图，先判断新建界面还是修改既有界面：新建界面应先完成 3 方向方案评审，修改既有界面确认已先截修改前截图，并在完成后运行 openprd visual-compare . --before <修改前截图> --after <修改后截图> 查看 JPG 自检图；若并行试了多个优化方向，再补 openprd visual-compare . --board <parallel-board.json>；若普通截图、Computer/Browser/Playwright 实测截图被用作证据，再补 openprd visual-compare . --board <verification-board.json> 的截图实测证据板；当用户说“跟效果图”“不一致”“好丑”“复刻”时，至少给出一份视觉证据图，不要只口头判断。发现可沉淀项时不要中途打断任务，代码扩展识别这类白名单工具补全会自动应用并记录，用户偏好、项目协作规矩和 OpenPrd 默认行为留到收工时用 openprd grow . --review 集中确认；维护 OpenPrd 本身且涉及配置类能力时，先判断是否应纳入 openprd grow；声明就绪前，请同步维护 docs/basic、文件说明书、文件夹 README，以及相关 OpenPrd change/task 状态；如果涉及后端、脚本、Agent、工具链、服务或数据处理变更，还要把 CLI 与 API 视为同级接入面并更新 docs/basic/backend-structure.md。');
+      return allowHook('OpenPrd 检测到写入动作。本轮写入完成后、最终回复前，请针对实际 touched code files 运行 openprd dev-check . <file...>；如出现需要关注的文件，最终回复必须以 **后续建议** 为标题，直接复用 dev-check 生成的 Markdown 表格，说明影响对象、关注程度、规模信号、预警原因、本次处理结果和后续建议，并按 🔴 → 🟠 → 🟡 排序；不要把“关注程度”列改写成纯 emoji，必须保留例如“🟠 中风险｜建议优先关注”这类完整标签；如果你改写了“预警原因 / 本次处理结果 / 后续建议”，先用 `node scripts/dev-check-wrapup-copy.mjs --validate` 校验每格不超过 20 字；若报错，按提示缩短后重试；如涉及界面视觉，包括卡片宽度、间距、留白、对齐、颜色、圆角、字号等轻量可视优化，build、package 和 dev-check 只能证明代码或构建状态，不能替代视觉证据；已有参考效果图并进入实现阶段时，阶段性完成后运行 openprd visual-compare . --reference <效果图> --actual <实现截图> 并查看 JPG 对比图；如果参考图来自本轮或前序 `imagegen`，先确认用户已接受它作为后续对比参考；若一张图里有多个子图、对象或网格，先运行 openprd visual-prepare . --reference <效果图> --grid <列>x<行> 或 --boxes <plan.json>，确认 contact sheet 后再逐项对比。若局部细节更重要，再补 openprd visual-compare . --board <focus-board.json>；如无参考图，先判断新建界面还是修改既有界面：新建界面应先完成 3 方向方案评审，修改既有界面确认已先截修改前截图，并在完成后运行 openprd visual-compare . --before <修改前截图> --after <修改后截图> 查看 JPG 自检图；若并行试了多个优化方向，再补 openprd visual-compare . --board <parallel-board.json>；若普通截图、Computer/Browser/Playwright 实测截图被用作证据，再补 openprd visual-compare . --board <verification-board.json> 的截图实测证据板；当用户说“跟效果图”“不一致”“好丑”“复刻”时，至少给出一份视觉证据图，不要只口头判断。发现可沉淀项时不要中途打断任务，代码扩展识别这类白名单工具补全会自动应用并记录，用户偏好、项目协作规矩和 OpenPrd 默认行为留到收工时用 openprd grow . --review 集中确认；维护 OpenPrd 本身且涉及配置类能力时，先判断是否应纳入 openprd grow；声明就绪前，请同步维护 docs/basic、文件说明书、文件夹 README，以及相关 OpenPrd change/task 状态；如果涉及后端、脚本、Agent、工具链、服务或数据处理变更，还要把 CLI 与 API 视为同级接入面并更新 docs/basic/backend-structure.md。');
     }
     return allowHook();
   }

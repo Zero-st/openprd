@@ -145,13 +145,13 @@ export function inferTestStrategyForTask(task = {}) {
     };
   }
 
-  if (includesAny(text, [/visual|视觉|截图|界面|页面|组件|样式|browser|playwright|cypress|e2e|端到端|用户主路径|主流程/])) {
+  if (includesAny(text, [/visual|视觉|截图|界面|页面|组件|样式|间距|留白|边距|宽度|高度|卡片|对齐|密度|圆角|颜色|字号|图标|按钮|padding|margin|spacing|gap|browser|playwright|cypress|e2e|端到端|用户主路径|主流程/])) {
     return {
       layers: ['integration', 'e2e'],
       size: 'large',
-      scope: includesAny(text, [/visual|视觉|截图|样式/]) ? 'visual-flow' : 'user-flow',
-      evidencePlan: '主流程自动化、截图或 visual-compare 证据 + 本任务 verify 命令',
-      upgradeReason: '触达用户可见路径，需要端到端或视觉级证据',
+      scope: includesAny(text, [/visual|视觉|截图|样式|间距|留白|边距|宽度|高度|卡片|对齐|密度|圆角|颜色|字号|图标|按钮|padding|margin|spacing|gap/]) ? 'visual-flow' : 'user-flow',
+      evidencePlan: '主流程自动化、截图或 visual-compare 证据 + 本任务 verify 命令；轻量 UI 可视优化也需要 before/after 或 verification-board 证据',
+      upgradeReason: '触达用户可见路径，需要端到端或视觉级证据；轻量 UI 可视优化不能只用构建或 dev-check 收口',
       inferred: true,
     };
   }
